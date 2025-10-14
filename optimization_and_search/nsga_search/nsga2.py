@@ -399,7 +399,7 @@ class Population:
                 c1 = params - 1_000_000_000
                 c2 = val_loss - 3.0
                 # c3 = latency_from_tp(throughput) - 180.0
-                objs = [float(val_loss), float(e_per_token), float(ttft)]
+                objs = [float(val_loss), float(val_loss), float(val_loss)]
                 eval_res = EvaluationResult(objs, [c1, c2], {
                     "params": params, "mem_bytes": mem_bytes, "FLOPs": flops
                 })
