@@ -87,6 +87,10 @@ def main():
         }
     search_space = HeteroSearchSpace.from_dicts(global_spec, layer_spec, L_max=max_n_layer, L_min=min_n_layer)
 
+    # update the working directory on remote hosts
+    trainer = RemoteTrainer(hosts=hosts, user=user, key_filename=key_filename)
+    trainer.perform_git_pull(remote_work_dir=f"/home/{user}/Evo_GPT")
+
     # initial evaluation
     if args.resume_ckpt is not None:
         if os.path.exists(args.resume_ckpt):
@@ -116,10 +120,6 @@ def main():
     run_time = time.strftime("%m%d_%H%M", time.localtime())
     population.save_checkpoint(f"ckpts/{exp_name}/{run_time}_ckpt_gen{population.gen}.json")
     population.save_checkpoint_pkl(f"ckpts/{exp_name}/{run_time}_pop_gen{population.gen}.pkl")
-
-    # update the working directory on remote hosts
-    trainer = RemoteTrainer(hosts=hosts, user=user, key_filename=key_filename)
-    trainer.perform_git_pull(remote_work_dir=f"/home/{user}/Evo_GPT")
 
     run_time = time.strftime("%m%d_%H%M", time.localtime())
     n_gen = args.generations
