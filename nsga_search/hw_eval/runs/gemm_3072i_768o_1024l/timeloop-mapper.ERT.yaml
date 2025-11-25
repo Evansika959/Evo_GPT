@@ -1,0 +1,91 @@
+ERT:
+    version: '0.4'
+    tables:
+      - name: System_top_level.DRAM[1..1]
+        actions:
+          - name: update
+            arguments:
+                global_cycle_seconds: 1e-09
+                action_latency_cycles: 1
+            energy: 512.0
+          - name: leak
+            arguments:
+                global_cycle_seconds: 1e-09
+                action_latency_cycles: 1
+            energy: 0.0
+          - name: read
+            arguments:
+                global_cycle_seconds: 1e-09
+                action_latency_cycles: 1
+            energy: 512.0
+          - name: write
+            arguments:
+                global_cycle_seconds: 1e-09
+                action_latency_cycles: 1
+            energy: 512.0
+      - name: System_top_level.Scratchpad[1..1]
+        actions:
+          - name: update
+            arguments:
+                global_cycle_seconds: 1e-09
+                action_latency_cycles: 1
+            energy: 54.0501
+          - name: leak
+            arguments:
+                global_cycle_seconds: 1e-09
+                action_latency_cycles: 1
+            energy: 0.0228391
+          - name: read
+            arguments:
+                global_cycle_seconds: 1e-09
+                action_latency_cycles: 1
+            energy: 57.039
+          - name: write
+            arguments:
+                global_cycle_seconds: 1e-09
+                action_latency_cycles: 1
+            energy: 54.0501
+      - name: System_top_level.Accumulator[1..16]
+        actions:
+          - name: update
+            arguments:
+                global_cycle_seconds: 1e-09
+                action_latency_cycles: 1
+            energy: 3.49104
+          - name: leak
+            arguments:
+                global_cycle_seconds: 1e-09
+                action_latency_cycles: 1
+            energy: 0.00083605
+          - name: read
+            arguments:
+                global_cycle_seconds: 1e-09
+                action_latency_cycles: 1
+            energy: 4.54186
+          - name: write
+            arguments:
+                global_cycle_seconds: 1e-09
+                action_latency_cycles: 1
+            energy: 3.49104
+      - name: System_top_level.Registers[1..256]
+        actions:
+          - name: write
+            arguments: {}
+            energy: 0.0245846
+          - name: read
+            arguments: {}
+            energy: 0.0846487
+          - name: leak
+            arguments: {}
+            energy: 2.0939e-05
+          - name: update
+            arguments: {}
+            energy: 0.0245846
+      - name: System_top_level.MAC[1..256]
+        actions:
+          - name: compute
+            arguments: {}
+            energy: 0.350374
+          - name: leak
+            arguments: {}
+            energy: 0.00400428

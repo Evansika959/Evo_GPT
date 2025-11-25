@@ -1,0 +1,80 @@
+mapping:
+  - target: Registers
+    type: datatype
+    keep:
+      - Weights
+    bypass:
+      - Inputs
+      - Outputs
+  - target: inter_PECols_spatial
+    type: datatype
+    keep:
+      []
+    bypass:
+      - Weights
+      - Inputs
+      - Outputs
+  - target: Accumulator
+    type: datatype
+    keep:
+      - Outputs
+    bypass:
+      - Weights
+      - Inputs
+  - target: inter_PERows_spatial
+    type: datatype
+    keep:
+      []
+    bypass:
+      - Weights
+      - Inputs
+      - Outputs
+  - target: Scratchpad
+    type: datatype
+    keep:
+      - Weights
+      - Inputs
+    bypass:
+      - Outputs
+  - target: DRAM
+    type: datatype
+    keep:
+      - Weights
+      - Inputs
+      - Outputs
+    bypass:
+      []
+  - target: Registers
+    type: temporal
+    factors: E1 D1 R1 S1 N1 L16 Q1 G1
+    permutation: LEDRSNQG
+  - target: inter_PECols_spatial
+    type: spatial
+    factors: E16 D1 R1 S1 N1 L1 Q1 G1
+    permutation: EDRSNLQG
+    split: 1
+  - target: inter_PECols_spatial
+    type: temporal
+    factors: E1 D1 R1 S1 N1 L1 Q1 G1
+    permutation: EDRSNLQG
+  - target: Accumulator
+    type: temporal
+    factors: E2 D5 R1 S1 N1 L32 Q1 G1
+    permutation: LEDRSNQG
+  - target: inter_PERows_spatial
+    type: spatial
+    factors: E1 D16 R1 S1 N1 L1 Q1 G1
+    permutation: DERSNLQG
+    split: 0
+  - target: inter_PERows_spatial
+    type: temporal
+    factors: E1 D1 R1 S1 N1 L1 Q1 G1
+    permutation: EDRSNLQG
+  - target: Scratchpad
+    type: temporal
+    factors: E24 D1 R1 S1 N1 L1 Q1 G1
+    permutation: EDRSNLQG
+  - target: DRAM
+    type: temporal
+    factors: E3 D16 R1 S1 N1 L1 Q1 G1
+    permutation: DERSNLQG

@@ -1,0 +1,15 @@
+./host_configs/*
+./nsga_search/ckpts/
+./nsga_search/train/
+./nsga_search/logs/
+./nsga_search/plots/
+./nsga_search/bash_scripts/
+./nsga_search/htmls/
+./nsga_search/visualization/
+./nsga_search/tests/
+./nsga_search/utils/
+./nsga_search/ref_models
+./nsga_search/*.bash
+./nsga_search/hw_eval/runs
+./nsga_search/search_space_def/
+./nsga_search/plots_paper/

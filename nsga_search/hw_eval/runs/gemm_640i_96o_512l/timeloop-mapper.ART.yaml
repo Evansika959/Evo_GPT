@@ -1,0 +1,17 @@
+ART:
+    version: '0.4'
+    tables:
+      - name: System_top_level.DRAM[1..1]
+        area: 0.0
+      - name: System_top_level.Scratchpad[1..1]
+        area: 901693.0
+      - name: System_top_level.inter_PERows_spatial[1..1]
+        area: 1.0
+      - name: System_top_level.Accumulator[1..16]
+        area: 29675.5
+      - name: System_top_level.inter_PECols_spatial[1..16]
+        area: 1.0
+      - name: System_top_level.Registers[1..256]
+        area: 94.1578
+      - name: System_top_level.MAC[1..256]
+        area: 440.523

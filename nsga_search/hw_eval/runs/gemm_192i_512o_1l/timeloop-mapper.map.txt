@@ -1,0 +1,18 @@
+DRAM [ Weights:98304 (98304) Inputs:192 (192) Outputs:512 (512) ] 
+Scratchpad [ Weights:98304 (98304) Inputs:192 (192) ] 
+inter_PERows_spatial [ ] 
+------------------------
+| for D in [0:16) (Spatial-Y)
+
+Accumulator [ Outputs:32 (32) ] 
+-------------------------------
+|   for D in [0:32)
+|     for E in [0:12)
+
+inter_PECols_spatial [ ] 
+------------------------
+|       for E in [0:16) (Spatial-X)
+
+Registers [ Weights:1 (1) ] 
+---------------------------
+|         << Compute >>

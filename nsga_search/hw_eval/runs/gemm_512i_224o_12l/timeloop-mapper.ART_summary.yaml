@@ -1,0 +1,32 @@
+ART_summary:
+    version: '0.4'
+    table_summary:
+      - name: System_top_level.DRAM[1..1]
+        area: 0.0
+        primitive_estimations: CactiDRAM
+      - name: System_top_level.Scratchpad[1..1]
+        area: 901693.0
+        primitive_estimations: CactiSRAM
+      - name: System_top_level.inter_PERows_spatial[1..1]
+        area: 1.0
+        primitive_estimations: dummy
+      - name: System_top_level.Accumulator[1..16]
+        area: 29675.5
+        primitive_estimations: CactiSRAM
+      - name: System_top_level.inter_PECols_spatial[1..16]
+        area: 1.0
+        primitive_estimations: dummy
+      - name: System_top_level.Registers[1..256]
+        area: 94.1578
+        primitive_estimations:
+          - name: storage[1..8]
+            estimator: Library
+          - name: comparator[1..1]
+            estimator: Library
+      - name: System_top_level.MAC[1..256]
+        area: 440.523
+        primitive_estimations:
+          - name: intadder
+            estimator: Library
+          - name: intmultiplier
+            estimator: Library
