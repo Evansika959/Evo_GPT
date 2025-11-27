@@ -1,4 +1,4 @@
-./host_configs/*
+./host_configs/*.yaml
 ./nsga_search/ckpts/
 ./nsga_search/train/
 ./nsga_search/logs/
@@ -13,3 +13,4 @@
 ./nsga_search/hw_eval/runs
 ./nsga_search/search_space_def/
 ./nsga_search/plots_paper/
+./nsga_search/__pycache__/
