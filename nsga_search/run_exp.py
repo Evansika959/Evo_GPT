@@ -59,6 +59,19 @@ def load_search_space_from_yaml(path: str) -> Tuple[Dict[str, Any], Dict[str, An
     return global_spec, layer_spec
 
 
+def parse_constraint_arg(entry: str) -> Tuple[str, float]:
+    if "=" not in entry:
+        raise argparse.ArgumentTypeError("Constraints must be formatted as key=value")
+    key, value = entry.split("=", 1)
+    key = key.strip()
+    if not key:
+        raise argparse.ArgumentTypeError("Constraint key cannot be empty")
+    try:
+        return key, float(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"Constraint value for '{key}' must be numeric")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Run NSGA-II search with remote evaluation")
     parser.add_argument(
@@ -86,6 +99,32 @@ def main():
         default="search_space_def/default_search_space.yaml",
         help="Path to YAML file defining 'global_spec' and 'layer_spec' (relative paths resolve from this script)",
     )
+    parser.add_argument(
+        "--objectives",
+        type=str,
+        nargs="+",
+        default=["val_loss", "token_delay", "energy_per_token_uJ"],
+        help="Ordered list of objectives to minimize during NSGA search.",
+    )
+    parser.add_argument(
+        "--max_params",
+        type=float,
+        default=800_000_000,
+        help="Constraint threshold on parameter count (params <= value).",
+    )
+    parser.add_argument(
+        "--max_val_loss",
+        type=float,
+        default=3.6,
+        help="Constraint threshold on validation loss (val_loss <= value).",
+    )
+    parser.add_argument(
+        "--constraint",
+        action="append",
+        type=parse_constraint_arg,
+        metavar="KEY=VALUE",
+        help="Repeated key=value entries to set custom constraint thresholds (e.g., --constraint params=5e8).",
+    )
     args = parser.parse_args()
 
     # set random seed for reproducibility
@@ -112,11 +151,19 @@ def main():
 
     exp_name = args.exp_name
 
-    objs = ["val_loss", "token_delay", "energy_per_token_uJ"]  # Minimize validation loss and number of parameters
-    cons = {
-        "params": 800_000_000,  # 800 million params
-        "val_loss": 3.6,  # 3.6
+    objs = args.objectives
+    cons: Dict[str, float]
+    if not args.constraint:
+        cons = {
+            "params": args.max_params,
+            "val_loss": args.max_val_loss,
         }
+    else:
+        cons = {}
+        for key, value in args.constraint:
+            cons[key] = value
+
+    sw_only = True
 
     # initial evaluation
     if args.resume_ckpt is not None:
@@ -138,7 +185,7 @@ def main():
         population.delete_duplicates()  # Remove duplicates if any
 
         # initial evaluation
-        population.sw_eval(hosts=hosts, user=user, key_filename=key_filename, run_dir_name=exp_name, conda_env=args.conda_env, max_iters=args.max_iters)
+        population.sw_eval(hosts=hosts, user=user, key_filename=key_filename, run_dir_name=exp_name, conda_env=args.conda_env, max_iters=args.max_iters, sw_only=sw_only)
         population.print_summary()
 
     # nsga parameters defined here
@@ -163,7 +210,7 @@ def main():
         population.generate_offspring()
         gen = population.gen
         print(f"\n\n================ Generation {gen} ================\n")
-        population.sw_eval(hosts=hosts, user=user, key_filename=key_filename, run_dir_name=exp_name, conda_env=args.conda_env, max_iters=args.max_iters)
+        population.sw_eval(hosts=hosts, user=user, key_filename=key_filename, run_dir_name=exp_name, conda_env=args.conda_env, max_iters=args.max_iters, sw_only=sw_only)
         population.save_checkpoint(f"ckpts/{exp_name}/{run_time}_ckpt_offspring_gen{gen}.json")
         population.update_elimination()
         population.print_summary()
