@@ -227,7 +227,6 @@ def main():
                 init_path = os.path.join(script_dir, init_path)
             logging.info(f"Initializing population from predefined individuals: {init_path}")
             individuals = load_initial_individuals(init_path)
-            init_population_size = len(individuals)
         else:
             individuals = [search_space.sample() for _ in range(init_population_size)]
 
@@ -257,7 +256,7 @@ def main():
     # run_time = time.strftime("%m%d_%H%M", time.localtime())
     n_gen = args.generations
     for i in range(0, n_gen):
-        population.generate_offspring()
+        population.generate_offspring_v2()
         gen = population.gen
         print(f"\n\n================ Generation {gen} ================\n")
         population.sw_eval(hosts=hosts, user=user, key_filename=key_filename, run_dir_name=exp_name, conda_env=args.conda_env, max_iters=args.max_iters, sw_only=sw_only)

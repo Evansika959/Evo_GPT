@@ -534,6 +534,83 @@ class HeteroSearchSpace:
                 B["globals"]["layer_mask"] = mask_b
 
         return self.repair(A), self.repair(B)
+    
+    # return the mutated offspring and the mutation operation applied
+    def mutate_v2(self, x: Dict[str,Any]) -> {Dict[str,Any], Dict[str,Any]}:
+        y = {"globals": dict(x["globals"]), "layers":[dict(li) for li in x["layers"]]}
+
+        # fix the mutation step size; retry if we would clamp to bounds
+        max_attempts = 10
+        applied = False
+        mutate_op = None
+
+        for _ in range(max_attempts):
+            mutate_op = {
+                "region": random.choice(["front", "middle", "back"]),
+                "type": random.choice(["shrink", "expand"]),
+                "param": random.choice(["n_head", "n_kv_group", "n_qk_head_dim", "n_v_head_dim", "mlp_size"]),
+            }
+
+            layer_cluter_len = 1
+            if mutate_op["region"] == "front":
+                layer_indices = range(0, min(layer_cluter_len, self.L_max))
+            elif mutate_op["region"] == "middle":
+                start = max(0, (self.L_max - layer_cluter_len) // 2)
+                end = min(self.L_max, start + layer_cluter_len)
+                layer_indices = range(start, end)
+            else:  # back
+                layer_indices = range(max(0, self.L_max - layer_cluter_len), self.L_max)
+
+            mutated_any = False
+            for i in layer_indices:
+                li = y["layers"][i]
+                k = mutate_op["param"]
+                s = self.layer_spec.get(k, None)
+                if s is None or s.get("type") != "int":
+                    continue
+                step = s.get("step", 1)
+                lo, hi = s["low"], s["high"]
+
+                if k == "n_head":
+                    # make sure the n_head is a multiple of n_kv_group after mutation
+                    n_kv_group = li.get("n_kv_group", 1)
+                    if n_kv_group > 1:
+                        # adjust step to be multiple of n_kv_group
+                        step = max(step, n_kv_group)
+
+                if mutate_op["type"] == "shrink":
+                    if li[k] - step < lo:
+                        continue  # would clamp; try another mutate_op
+                    new_val = li[k] - step
+                else:  # expand
+                    if li[k] + step > hi:
+                        continue  # would clamp; try another mutate_op
+                    new_val = li[k] + step
+
+                if k == "n_kv_group":
+                    n_head = li.get("n_head", 8)
+                    if mutate_op["type"] == "shrink":
+                        # ensure n_kv_group divides n_head
+                        divisors = [g for g in range(1, n_head + 1) if n_head % g == 0 and g <= new_val]
+                        if not divisors:
+                            continue  # no valid divisor found
+                        new_val = max(divisors)
+                    else:  # expand
+                        divisors = [g for g in range(1, n_head + 1) if n_head % g == 0 and g >= new_val]
+                        if not divisors:
+                            continue  # no valid divisor found
+                        new_val = min(divisors)
+
+                li[k] = new_val
+                mutated_any = True
+                
+
+            if mutated_any:
+                applied = True
+                break
+
+        # even if no mutation applied after attempts, return repaired individual
+        return self.repair(y), mutate_op
 
     def mutate(self, x: Dict[str,Any],
         p_glob_int=0.1, p_glob_float=0.1,

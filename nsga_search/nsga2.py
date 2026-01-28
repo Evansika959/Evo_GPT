@@ -31,6 +31,9 @@ class Population:
         self.evaluations: List[EvaluationResult] = evaluations or []
         self.offspring: List[Individual] = []
         self.offspring_evaluations: List[EvaluationResult] = []
+        self.offspring_mutation_ops: List[Dict[str, Any]] = []
+        # track mutation op that produced each current individual (aligned with self.individuals)
+        self.individual_mutation_ops: List[Any] = [None] * len(self.individuals)
         self.gen = 0
 
         self.search_space = search_space
@@ -179,9 +182,11 @@ class Population:
                 continue
             cd = crowding_distance(front, objs)
             order.extend(sorted(front, key=lambda i: cd[i], reverse=True))
-        # Apply permutation to individuals and evaluations
+        # Apply permutation to individuals, evaluations, and mutation metadata
         self.individuals = [self.individuals[i] for i in order]
         self.evaluations = [self.evaluations[i] for i in order]
+        if hasattr(self, "individual_mutation_ops") and len(self.individual_mutation_ops) == len(order):
+            self.individual_mutation_ops = [self.individual_mutation_ops[i] for i in order]
         print(f"Reordered individuals and evaluations by non-domination: {order}")
         return
     
@@ -262,6 +267,8 @@ class Population:
             "offspring_evaluations": None if self.offspring_evaluations is None else [
                 {"objs": ev.objs, "cons": ev.cons, "aux": ev.aux} for ev in self.offspring_evaluations
             ],
+            "offspring_mutation_ops": self.offspring_mutation_ops,
+            "individual_mutation_ops": self.individual_mutation_ops,
             # Population parameters
             "n_offspring": self.n_offspring,
             "tournament_k": self.tournament_k,
@@ -329,6 +336,7 @@ class Population:
         pop.gen = int(data.get("gen", 0))
         pop.offspring = offspring
         pop.offspring_evaluations = offspring_evaluations if offspring_evaluations is not None else []
+        pop.offspring_mutation_ops = data.get("offspring_mutation_ops", [])
         
         # Restore population parameters
         pop.n_offspring = data.get("n_offspring", 32)
@@ -499,9 +507,41 @@ class Population:
 
         self.offspring = offspring
         self.offspring_evaluations = []
+        self.offspring_mutation_ops = []
         self.gen += 1
         print(f"Generated {self.n_offspring} offspring for generation {self.gen}")
         return
+    
+    def generate_offspring_v2(self) -> List[Dict[str,Any]]:
+        """Generate offspring via tournament selection and mutation, return as list of dicts."""
+        if self.evaluations is None or not self.evaluations:
+            raise ValueError("Cannot generate offspring without evaluations.")
+        if self.search_space is None:
+            raise ValueError("Search space is not defined for mutation.")
+        search_space = self.search_space
+        offspring = []
+        mutation_ops: List[Dict[str, Any]] = [] 
+        for _ in range(self.n_offspring):
+            p_idx = tournament_select(self.individuals, self.evaluations, k=self.tournament_k)
+            p = self.individuals[p_idx]
+            child, mutation_op = self.search_space.mutate_v2(p)
+            # child2 = self.search_space.mutate(parent2, self.mutation_rate)
+            print("Generated offspring:")
+            print(f"Mutation op: {mutation_op}")
+            child.print_individual()
+            if isinstance(child, Individual):
+                offspring.append(child)
+            else:
+                offspring.append(Individual.from_dict(child))
+            mutation_ops.append(mutation_op)
+
+        self.offspring = offspring
+        self.offspring_evaluations = []
+        self.offspring_mutation_ops = mutation_ops
+        self.gen += 1
+        print(f"Generated {self.n_offspring} offspring for generation {self.gen}")
+        return offspring
+
     
     def generate_offspring_random(self) -> None:
         """Generate offspring randomly from the search space."""
@@ -527,10 +567,18 @@ class Population:
         # append offspring to current population
         self.individuals.extend(self.offspring)
         self.evaluations.extend(self.offspring_evaluations)
+        if hasattr(self, "individual_mutation_ops"):
+            # align offspring mutation ops with appended individuals
+            if len(self.offspring_mutation_ops) == len(self.offspring):
+                self.individual_mutation_ops.extend(self.offspring_mutation_ops)
+            else:
+                # fallback: extend with None placeholders
+                self.individual_mutation_ops.extend([None] * len(self.offspring))
 
         # Clear the offspring lists for the next generation
         self.offspring = []
         self.offspring_evaluations = []
+        self.offspring_mutation_ops = []
 
         # Reorder by non-domination and keep the best individuals
         self.reorder_by_non_domination()
@@ -538,6 +586,8 @@ class Population:
             print(f"Eliminating {len(self.individuals) - self.n_population} individuals to maintain population size {self.n_population}.")
             self.individuals = self.individuals[:self.n_population]
             self.evaluations = self.evaluations[:self.n_population]
+            if hasattr(self, "individual_mutation_ops"):
+                self.individual_mutation_ops = self.individual_mutation_ops[:self.n_population]
         else:
             print(f"Population size {len(self.individuals)} is within limit {self.n_population}, no elimination needed.")
 
