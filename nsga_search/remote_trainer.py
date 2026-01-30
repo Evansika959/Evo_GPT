@@ -179,7 +179,7 @@ fi
                 overall_ok = False
         return overall_ok
 
-    def submit_job(self, path_to_yaml: str, remote_work_dir: str, dir_name: str, conda_env: str = "reallmforge", max_iters: int = 10000) -> bool:
+    def submit_job(self, path_to_yaml: str, remote_work_dir: str, dir_name: str, conda_env: str = "reallmforge", max_iters: int = 10000, dataset: str = "minipile") -> bool:
         # Load the aggregated YAML (expects a top-level list of configs)
         yaml_path = Path(path_to_yaml)
         if yaml is None:
@@ -270,7 +270,7 @@ fi
                     f"echo \"[launcher] which conda: $CONDA_BIN\";\n"
                     f"if [ -n \"$CONDA_BIN\" ] && conda run -n {conda_env} python -V >/dev/null 2>&1; then\n"
                     f"  echo \"[launcher] using conda run -n {conda_env}\";\n"
-                    f"  conda run -n {conda_env} python -u optimization_and_search/run_from_yaml.py --yaml {remote_yaml_path} --output_dir {remote_run_dir} --prefix {base} --override_args max_iters={max_iters}; ec=$?;\n"
+                    f"  conda run -n {conda_env} python -u optimization_and_search/run_from_yaml.py --yaml {remote_yaml_path} --output_dir {remote_run_dir} --prefix {base} --override_args max_iters={max_iters} --dataset={dataset}; ec=$?;\n"
                     f"else\n"
                     f"  if [ -n \"$CONDA_BIN\" ]; then eval \"$(conda shell.bash hook)\" >/dev/null 2>&1 || true; fi;\n"
                     f"  if command -v conda >/dev/null 2>&1; then\n"
@@ -283,7 +283,7 @@ fi
                     f"  echo \"[launcher] conda: $(conda --version 2>/dev/null || echo not-found)\";\n"
                     f"  echo \"[launcher] which python: $(which python 2>/dev/null || echo not-found)\";\n"
                     f"  python -V || true;\n"
-                    f"  python -u optimization_and_search/run_from_yaml.py --yaml {remote_yaml_path} --output_dir {remote_run_dir} --prefix {base} --override_args max_iters={max_iters}; ec=$?;\n"
+                    f"  python -u optimization_and_search/run_from_yaml.py --yaml {remote_yaml_path} --output_dir {remote_run_dir} --prefix {base} --override_args max_iters={max_iters} --dataset={dataset}; ec=$?;\n"
                     f"fi;\n"
                     f"echo $ec > {remote_run_dir}/exit_code\n"
                     f"}} >> {remote_log_path} 2>&1 < /dev/null &\n"

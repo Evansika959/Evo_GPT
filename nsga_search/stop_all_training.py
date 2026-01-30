@@ -1,13 +1,6 @@
-from nsga2 import Population
-from typing import List, Dict, Any
-from search_space import Individual
-from search_space import HeteroSearchSpace
-import yaml
 from remote_trainer import RemoteTrainer  
 import logging
-import time
 from run_exp import load_hosts_from_file
-import os
 import argparse
 
 
@@ -22,7 +15,7 @@ def main():
     parser.add_argument(
         "--hosts",
         type=str,
-        default="../host_configs/hosts_6instance.yaml",
+        default="../host_configs/hosts_8instances.yaml",
         help="Path to YAML file listing remote hosts",
     )
     parser.add_argument(
