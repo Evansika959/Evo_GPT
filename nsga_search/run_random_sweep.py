@@ -157,6 +157,7 @@ def main():
     print(search_space.print_search_space())
 
     exp_name = args.exp_name
+    init_population_size = args.per_round_sample_size
 
     sw_only = True
 
@@ -164,16 +165,16 @@ def main():
     trainer = RemoteTrainer(hosts=hosts, user=user, key_filename=key_filename)
     trainer.perform_git_pull(remote_work_dir=f"/home/{user}/Evo_GPT")
 
-    entire_population = Population([], search_space=search_space, objs_settings=objs, cons_settings=cons)
+    entire_population = Population([], search_space=search_space)
 
     for i in range(0, n_rounds):
         individuals = [search_space.sample() for _ in range(init_population_size)]
-        population = Population(individuals, search_space=search_space, objs_settings=objs, cons_settings=cons)
+        population = Population(individuals, search_space=search_space)
         population.n_population = init_population_size
         print(f"\n\n================ Round {i} ================\n")
         population.sw_eval(hosts=hosts, user=user, key_filename=key_filename, run_dir_name=exp_name, conda_env=args.conda_env, max_iters=args.max_iters, sw_only=sw_only)
         population.print_summary()
-        entire_population.append_population(population)
+        entire_population.append_population(added_individuals=population.individuals, added_evaluations=population.evaluations)
     
     timestamp = int(time.time())
     entire_population.save_to_csv(f"csv/{exp_name}_random_sweep_{timestamp}.csv")
