@@ -4,6 +4,7 @@ from search_space import Individual
 from search_space import HeteroSearchSpace
 import yaml
 from remote_trainer import RemoteTrainer  
+from fabric import Connection
 import logging
 import time
 from run_exp import load_hosts_from_file
@@ -22,7 +23,7 @@ def main():
     parser.add_argument(
         "--hosts",
         type=str,
-        default="../host_configs/hosts_6instance.yaml",
+        default="../host_configs/hosts_8instances.yaml",
         help="Path to YAML file listing remote hosts",
     )
     parser.add_argument(
@@ -47,6 +48,21 @@ def main():
 
     trainer = RemoteTrainer(hosts=hosts, user=user, key_filename=key_filename)
     trainer.check_connectivity()
+    # Report available disk space on each host
+    print("Disk availability per host (df -h /):")
+    for i, host in enumerate(hosts):
+        try:
+            with Connection(host=host, user=user, connect_kwargs={"key_filename": key_filename} if key_filename else {}) as conn:
+                conn.open()
+                # Use df with explicit columns for stable parsing
+                r = conn.run("df -h --output=target,avail,pcent / | tail -n 1", hide=True, warn=True)
+                if r.ok:
+                    mount, avail, used_pct = r.stdout.strip().split()
+                    print(f"  host_{i} ({host}): mount={mount}, avail={avail}, used={used_pct}")
+                else:
+                    print(f"  host_{i} ({host}): failed to read disk space ({r.stderr.strip()})")
+        except Exception as e:
+            print(f"  host_{i} ({host}): disk check error: {e}")
     trainer.perform_git_pull("/home/xinting/Evo_GPT")
     trainer.clear_all_jobs()
     print("Cleared all training jobs on remote hosts.")

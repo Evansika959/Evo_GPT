@@ -597,6 +597,61 @@ class Population:
                 print(f"Individual {i+1}: Objs={ev.objs}, Cons={ev.cons}, Aux={ev.aux}")
         return
 
+    def append_population(self, added_individuals: List[Individual], added_evaluations: List[EvaluationResult]) -> None:
+        """Append new individuals and their evaluations to the population."""
+        if len(added_individuals) != len(added_evaluations):
+            raise ValueError("Length of added individuals and evaluations must match.")
+        self.individuals.extend(added_individuals)
+        self.evaluations.extend(added_evaluations)
+        if hasattr(self, "individual_mutation_ops"):
+            self.individual_mutation_ops.extend([None] * len(added_individuals))
+        print(f"Appended {len(added_individuals)} individuals to the population.")
+        return
+
+    def write_to_csv(self, filepath: str) -> None:
+        """Write the population individuals and their evaluations to a CSV file. (faltten the per-layer settings)"""
+        os.makedirs(os.path.dirname(filepath) or ".", exist_ok=True)
+        with open(filepath, 'w', newline='') as csvfile:
+            fieldnames = ['#idx']
+            # collect global keys
+            if self.individuals:
+                global_keys = list(self.individuals[0]['globals'].keys())
+                for key in global_keys:
+                    fieldnames.append(f'global_{key}')
+                # collect per-layer keys (flattened)
+                layer_keys = list(self.individuals[0]['layers'][0].keys())
+                max_layers = max(len(ind['layers']) for ind in self.individuals)
+                for layer_idx in range(max_layers):
+                    for key in layer_keys:
+                        fieldnames.append(f'layer{layer_idx}_{key}')
+            # add evaluation fields
+            if self.evaluations:
+                aux_keys = list(self.evaluations[0].aux.keys())
+                for key in aux_keys:
+                    fieldnames.append(key)
+
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            for idx, (ind, ev) in enumerate(zip(self.individuals, self.evaluations or [])):
+                row = {'#idx': idx + 1}
+                for key in global_keys:
+                    row[f'global_{key}'] = ind['globals'].get(key)
+                for layer_idx in range(max_layers):
+                    if layer_idx < len(ind['layers']):
+                        layer = ind['layers'][layer_idx]
+                        for key in layer_keys:
+                            row[f'layer{layer_idx}_{key}'] = layer.get(key)
+                    else:
+                        for key in layer_keys:
+                            row[f'layer{layer_idx}_{key}'] = None
+                if ev:
+                    for key, val in ev.aux.items():
+                        row[key] = val
+                writer.writerow(row)
+        print(f"Wrote population data to CSV file: {filepath}")
+        return
+           
+
 # -----------------------------
 # CSV loading utility
 # -----------------------------
