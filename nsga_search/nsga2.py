@@ -58,7 +58,7 @@ class Population:
             print(f"Evaluations completed: {len(self.evaluations)}")
             # Show objective statistics
             objs = [ev.objs for ev in self.evaluations]
-            if objs:
+            if objs and self.objs_settings is not None:
                 print(f"\nObjective Statistics:")
                 # do not hardcode
                 for i, obj_name in enumerate(self.objs_settings):
@@ -67,7 +67,7 @@ class Population:
 
             # Show constraint violations
             cons = [ev.cons for ev in self.evaluations]
-            if cons:
+            if cons and self.cons_settings is not None:
                 print(f"\nConstraint Violations:")
                 for i, con_name in enumerate(self.cons_settings.keys()):
                     values = [c[i] for c in cons]
@@ -110,12 +110,35 @@ class Population:
         return f"Population(gen={self.gen}, size={len(self.individuals)}, evaluated={len(self.evaluations) if self.evaluations else 0})"
 
     def delete_duplicates(self):
-        unique = {}
-        for ind in self.individuals:
+        """Drop duplicate individuals and keep evaluations aligned.
+
+        Keeps the first occurrence of each unique individual (JSON-serialized) and
+        removes later duplicates in both `individuals` and `evaluations` (if present).
+        Offspring lists are untouched because they correspond to a different cycle.
+        """
+        unique_map = {}
+        keep_indices = []
+        for idx, ind in enumerate(self.individuals):
             key = json.dumps(ind, sort_keys=True)
-            if key not in unique:
-                unique[key] = ind
-        self.individuals = list(unique.values())
+            if key in unique_map:
+                continue  # duplicate -> drop
+            unique_map[key] = idx
+            keep_indices.append(idx)
+
+        # If no duplicates, exit early
+        if len(keep_indices) == len(self.individuals):
+            return
+
+        # Filter individuals
+        self.individuals = [self.individuals[i] for i in keep_indices]
+
+        # Filter evaluations if lengths align
+        if self.evaluations and len(self.evaluations) >= max(keep_indices) + 1:
+            self.evaluations = [self.evaluations[i] for i in keep_indices]
+
+        # Filter mutation metadata if aligned
+        if hasattr(self, "individual_mutation_ops") and len(self.individual_mutation_ops) >= max(keep_indices) + 1:
+            self.individual_mutation_ops = [self.individual_mutation_ops[i] for i in keep_indices]
 
     def fast_non_dominated_sort(self, objs: List[List[float]] = None, cons: List[List[float]] = None) -> List[List[int]]:
         """Perform non-dominated sorting and return a list of fronts (each front is a list of indices).
@@ -359,7 +382,7 @@ class Population:
 
         return hw_data
 
-    def sw_eval(self, hosts: List[str], user: str, key_filename: str, run_dir_name: str, max_iters: int = 10000, conda_env: str = "reallmforge", sw_only: bool = False, hw_eval_on_reallmasic: bool = False) -> None:
+    def sw_eval(self, hosts: List[str], user: str, key_filename: str, run_dir_name: str, max_iters: int = 10000, conda_env: str = "reallmforge", sw_only: bool = False, hw_eval_on_reallmasic: bool = False, timeout: int = 10000) -> None:
         # send the training work to worker nodes and wait for results
         train_yaml_path = self.to_yaml(save_path="train")
         trainer = RemoteTrainer(hosts=hosts, user=user, key_filename=key_filename)
@@ -378,7 +401,7 @@ class Population:
             elapsed_time = time.time() - start_time
             print(f"Finished HW evaluation for generation {self.gen} in {elapsed_time:.1f}s")
             print("====================================================")
-        trainer.wait_for_all(poll_interval=120, timeout=10000, verbose=True)
+        trainer.wait_for_all(poll_interval=120, timeout=timeout, verbose=True)
         data_csv = trainer.fetch_results(local_dir="train", gen=self.gen)
         # read the csv and populate self.evaluations
         # load the csv file's second column as a list of floats

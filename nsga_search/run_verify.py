@@ -117,19 +117,54 @@ def main():
     )
     parser.add_argument("--user", type=str, default="xinting", help="SSH username")
     parser.add_argument("--key", type=str, default="/home/xinting/.ssh/id_rsa", help="Path to SSH private key")
+    parser.add_argument("--pop_size", type=int, default=16, help="Population size")
     parser.add_argument("--max_layers", type=int, default=10, help="Max number of layers (L_max)")
     parser.add_argument("--min_layers", type=int, default=1, help="Min number of layers (L_min)")
-    parser.add_argument("--total_sample_size", type=int, default=8, help="Total number of offspring to sample per generation")
-    parser.add_argument("--per_round_sample_size", type=int, default=8, help="Number of offspring to sample per round")
-    parser.add_argument("--exp_name", type=str, default="3layer_random_minipile_iter10k", help="Experiment name for checkpoint directory")
+    parser.add_argument("--offspring", type=int, default=8, help="Number of offspring per generation")
+    parser.add_argument("--generations", type=int, default=15, help="Number of generations to run")
+    parser.add_argument("--resume_ckpt", type=str, default=None, help="Path to checkpoint file to resume from (optional)")
+    parser.add_argument("--exp_name", type=str, default="infi_attn_exp_iter20k", help="Experiment name for checkpoint directory")
     parser.add_argument("--conda_env", type=str, default="reallmforge", help="Conda environment name on remote hosts")
     parser.add_argument("--max_iters", type=int, default=10000, help="Max training iterations per evaluation")
-    parser.add_argument("--log_steps", type=int, default=5, help="Logging steps interval during training")
+    parser.add_argument("--crossover_rate", type=float, default=0.9, help="Crossover rate for NSGA-II")
+    parser.add_argument("--mutation_rate", type=float, default=0.1, help="Mutation rate for NSGA-II")
     parser.add_argument(
         "--search_space_config",
         type=str,
         default="search_space_def/default_search_space.yaml",
         help="Path to YAML file defining 'global_spec' and 'layer_spec' (relative paths resolve from this script)",
+    )
+    parser.add_argument(
+        "--objectives",
+        type=str,
+        nargs="+",
+        default=["val_loss", "token_delay", "energy_per_token_uJ"],
+        help="Ordered list of objectives to minimize during NSGA search.",
+    )
+    parser.add_argument(
+        "--max_params",
+        type=float,
+        default=800_000_000,
+        help="Constraint threshold on parameter count (params <= value).",
+    )
+    parser.add_argument(
+        "--max_val_loss",
+        type=float,
+        default=3.6,
+        help="Constraint threshold on validation loss (val_loss <= value).",
+    )
+    parser.add_argument(
+        "--constraint",
+        action="append",
+        type=parse_constraint_arg,
+        metavar="KEY=VALUE",
+        help="Repeated key=value entries to set custom constraint thresholds (e.g., --constraint params=5e8).",
+    )
+    parser.add_argument(
+        "--init_individuals",
+        type=str,
+        default=None,
+        help="Optional path to a JSON/YAML file containing predefined individuals (list of dicts). Overrides random initialization when set.",
     )
     args = parser.parse_args()
 
@@ -141,9 +176,7 @@ def main():
     user = args.user
     key_filename = args.key
 
-    total_sample_size = args.total_sample_size
-    per_round_sample_size = args.per_round_sample_size
-    n_rounds = total_sample_size // per_round_sample_size
+    init_population_size = args.pop_size
     max_n_layer = args.max_layers
     min_n_layer = args.min_layers
     config_path = args.search_space_config
@@ -158,32 +191,41 @@ def main():
     print(search_space.print_search_space())
 
     exp_name = args.exp_name
-    init_population_size = args.per_round_sample_size
+
+    objs = args.objectives
+    cons: Dict[str, float]
+    if not args.constraint:
+        cons = {
+            "params": args.max_params,
+            "val_loss": args.max_val_loss,
+        }
+    else:
+        cons = {}
+        for key, value in args.constraint:
+            cons[key] = value
 
     sw_only = True
 
-    # update the working directory on remote hosts
-    trainer = RemoteTrainer(hosts=hosts, user=user, key_filename=key_filename)
-    trainer.perform_git_pull(remote_work_dir=f"/home/{user}/Evo_GPT")
-
-    entire_population = Population([], search_space=search_space)
-
-    timestamp = int(time.time())
-
-    for i in range(0, n_rounds):
-        individuals = [search_space.sample() for _ in range(init_population_size)]
-        population = Population(individuals, search_space=search_space)
-        population.n_population = init_population_size
-        print(f"\n\n================ Round {i} ================\n")
-        population.sw_eval(hosts=hosts, user=user, key_filename=key_filename, run_dir_name=exp_name, conda_env=args.conda_env, max_iters=args.max_iters, sw_only=sw_only)
+    # initial evaluation
+    if args.resume_ckpt is not None:
+        if os.path.exists(args.resume_ckpt):
+            logging.info(f"Resuming from checkpoint: {args.resume_ckpt}")
+            population = Population.load_checkpoint(args.resume_ckpt, from_pkl=args.resume_ckpt.endswith('.pkl'))
+        else:
+            raise FileNotFoundError(f"Checkpoint file not found: {args.resume_ckpt}")
+        population.search_space = search_space  # Ensure search space is set
         population.print_summary()
-        
-        entire_population.append_population(added_individuals=population.individuals, added_evaluations=population.evaluations)
-        if i % args.log_steps == 0:
-            entire_population.write_to_csv(f"csv/{exp_name}_{timestamp}/random_sweep_round{i}.csv")
 
-    entire_population.write_to_csv(f"csv/{exp_name}_random_sweep_{timestamp}.csv")
+        population.objs_settings = objs
+        population.cons_settings = cons
         
+        # now rerun the evaluations for the loaded population
+        population.gen = 0
+        population.sw_eval(hosts=hosts, user=user, key_filename=key_filename, run_dir_name=exp_name, conda_env=args.conda_env, max_iters=args.max_iters, sw_only=sw_only)
+        
+        population.save_checkpoint(f"ckpts/{exp_name}/{run_time}_ckpt_gen{gen}.json")
+    else:
+        exit("No checkpoint provided. Please provide --resume_ckpt to load an existing population or implement random initialization logic.")
 
 if __name__ == "__main__":
     main()
