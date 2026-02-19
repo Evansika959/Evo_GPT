@@ -382,11 +382,11 @@ class Population:
 
         return hw_data
 
-    def sw_eval(self, hosts: List[str], user: str, key_filename: str, run_dir_name: str, max_iters: int = 10000, conda_env: str = "reallmforge", sw_only: bool = False, hw_eval_on_reallmasic: bool = False, timeout: int = 10000) -> None:
+    def sw_eval(self, hosts: List[str], user: str, key_filename: str, run_dir_name: str, max_iters: int = 10000, conda_env: str = "reallmforge", sw_only: bool = False, hw_eval_on_reallmasic: bool = False, timeout: int = 10000, dataset: str = "minipile") -> None:
         # send the training work to worker nodes and wait for results
         train_yaml_path = self.to_yaml(save_path="train")
         trainer = RemoteTrainer(hosts=hosts, user=user, key_filename=key_filename)
-        trainer.submit_job(path_to_yaml=train_yaml_path, remote_work_dir=f"/home/{user}/Evo_GPT", dir_name=run_dir_name, max_iters=max_iters, conda_env=conda_env)
+        trainer.submit_job(path_to_yaml=train_yaml_path, remote_work_dir=f"/home/{user}/Evo_GPT", dir_name=run_dir_name, max_iters=max_iters, conda_env=conda_env, dataset=dataset)
         time.sleep(5)  # wait a bit before polling
         trainer.poll_jobs() 
         # start hw eval while waiting for training
