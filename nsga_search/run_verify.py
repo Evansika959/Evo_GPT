@@ -205,6 +205,7 @@ def main():
             cons[key] = value
 
     sw_only = True
+    run_time = time.strftime("%Y%m%d-%H%M%S")
 
     # initial evaluation
     if args.resume_ckpt is not None:
@@ -221,9 +222,13 @@ def main():
         
         # now rerun the evaluations for the loaded population
         population.gen = 0
-        population.sw_eval(hosts=hosts, user=user, key_filename=key_filename, run_dir_name=exp_name, conda_env=args.conda_env, max_iters=args.max_iters, sw_only=sw_only)
+        population.evaluations = None  # Clear old evaluations to force re-evaluation
+        population.offspring_evaluations = None
+        population.sw_eval(hosts=hosts, user=user, key_filename=key_filename, 
+                           run_dir_name=exp_name, conda_env=args.conda_env, 
+                           max_iters=args.max_iters, sw_only=sw_only, timeout=200000)
         
-        population.save_checkpoint(f"ckpts/{exp_name}/{run_time}_ckpt_gen{gen}.json")
+        population.save_checkpoint(f"ckpts/{exp_name}/{run_time}_ckpt_gen{population.gen}.json")
     else:
         exit("No checkpoint provided. Please provide --resume_ckpt to load an existing population or implement random initialization logic.")
 

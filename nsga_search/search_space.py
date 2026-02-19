@@ -277,9 +277,10 @@ class Individual(dict):
         return
 
 class HeteroSearchSpace:
-    def __init__(self, L_max=24, L_min=1):
+    def __init__(self, L_max=24, L_min=1, freeze_layer_mask: bool = False):
         self.L_max = L_max
         self.L_min = L_min  # minimum active layers
+        self.freeze_layer_mask = freeze_layer_mask
 
         self.no_repair = False  # if True, sample() does not call repair()
 
@@ -306,7 +307,8 @@ class HeteroSearchSpace:
         layer_spec: Dict[str, Any],
         L_max: int = 24,
         L_min: int = 1, 
-        no_repair: bool = False
+        no_repair: bool = False,
+        freeze_layer_mask: bool = False
     ) -> "HeteroSearchSpace":
         """Alternate constructor: build a search space from explicit spec dicts.
 
@@ -321,7 +323,7 @@ class HeteroSearchSpace:
 
         Returns a configured HeteroSearchSpace instance.
         """
-        inst = cls(L_max=L_max, L_min=L_min)
+        inst = cls(L_max=L_max, L_min=L_min, freeze_layer_mask=freeze_layer_mask)
         inst.globals = cls._normalize_spec_dict(globals_spec)
         inst.no_repair = no_repair
         if layer_spec is None:
@@ -412,7 +414,9 @@ class HeteroSearchSpace:
         layers = [self._sample_layer() for _ in range(self.L_max)]
         x: Individual = Individual(g, layers)
         # if globals does not yet have layer_mask (e.g., older serialized), create one
-        if "layer_mask" not in x["globals"]:
+        if self.freeze_layer_mask:
+            x["globals"]["layer_mask"] = [True] * self.L_max
+        elif "layer_mask" not in x["globals"]:
             active_count = random.randint(self.L_min, self.L_max)
             idxs = set(random.sample(range(self.L_max), active_count))
             x["globals"]["layer_mask"] = [i in idxs for i in range(self.L_max)]
@@ -425,7 +429,9 @@ class HeteroSearchSpace:
             return Individual.from_dict(x)
         if "globals" not in x:
             x["globals"] = {}
-        if "layer_mask" not in x["globals"]:
+        if self.freeze_layer_mask:
+            x["globals"]["layer_mask"] = [True] * self.L_max
+        elif "layer_mask" not in x["globals"]:
             x["globals"]["layer_mask"] = [True]*self.L_max
         mask = list(x["globals"]["layer_mask"])[:self.L_max]
         if len(mask) < self.L_max:
@@ -663,31 +669,34 @@ class HeteroSearchSpace:
 
         # mutate layer usage mask: flip a few bits
         mask = list(x["globals"].get("layer_mask", [True]*self.L_max))
-        turn_on_rate = 0.2
-        turn_off_rate = 0.1
-        for i in range(len(mask)):
-            if mask[i]:
-                # currently on, may turn off
-                if random.random() < turn_off_rate:
-                    mask[i] = False
-            else:
-                # currently off, may turn on
-                if random.random() < turn_on_rate:
-                    mask[i] = True
-                    # copy the layer_configs from the nearsest active layer
-                    left = right = None
-                    for j in range(i-1, -1, -1):
-                        if mask[j]:
-                            left = j
-                            break
-                    for j in range(i+1, self.L_max):
-                        if mask[j]:
-                            right = j
-                            break
-                    if left is not None:
-                        y["layers"][i] = y["layers"][left]
-                    if right is not None:
-                        y["layers"][i] = y["layers"][right]
+        if self.freeze_layer_mask:
+            mask = [True] * self.L_max
+        else:
+            turn_on_rate = 0.2
+            turn_off_rate = 0.1
+            for i in range(len(mask)):
+                if mask[i]:
+                    # currently on, may turn off
+                    if random.random() < turn_off_rate:
+                        mask[i] = False
+                else:
+                    # currently off, may turn on
+                    if random.random() < turn_on_rate:
+                        mask[i] = True
+                        # copy the layer_configs from the nearsest active layer
+                        left = right = None
+                        for j in range(i-1, -1, -1):
+                            if mask[j]:
+                                left = j
+                                break
+                        for j in range(i+1, self.L_max):
+                            if mask[j]:
+                                right = j
+                                break
+                        if left is not None:
+                            y["layers"][i] = y["layers"][left]
+                        if right is not None:
+                            y["layers"][i] = y["layers"][right]
 
         # ensure still at least four active
         min_layers = self.L_min
