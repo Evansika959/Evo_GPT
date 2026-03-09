@@ -1,0 +1,306 @@
+#!/usr/bin/env python3
+"""Two-phase uptraining for morphed Qwen3 IHA checkpoints."""
+from __future__ import annotations
+
+import argparse
+import math
+import os
+from typing import Iterable, Dict, Any
+
+import torch
+from datasets import load_dataset
+from torch.utils.data import DataLoader
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+from compare_ppl import run_ppl_comparison
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Uptrain morphed Qwen3 checkpoint")
+    parser.add_argument("--model_dir", type=str, required=True)
+    parser.add_argument("--output_dir", type=str, required=True)
+    parser.add_argument("--dataset_name", type=str, default="Salesforce/wikitext")
+    parser.add_argument("--dataset_config_name", type=str, default=None)
+    parser.add_argument("--dataset_split", type=str, default="train")
+    parser.add_argument("--data_path", type=str, default=None)
+    parser.add_argument("--text_column", type=str, default="text")
+    parser.add_argument("--block_size", type=int, default=1024)
+    parser.add_argument("--per_device_train_batch_size", type=int, default=1)
+    parser.add_argument("--learning_rate_phase1", type=float, default=1e-5)
+    parser.add_argument("--learning_rate_phase2", type=float, default=5e-6)
+    parser.add_argument("--max_steps_phase1", type=int, default=200)
+    parser.add_argument("--max_steps_phase2", type=int, default=800)
+    parser.add_argument("--warmup_steps", type=int, default=50)
+    parser.add_argument("--max_grad_norm", type=float, default=1.0)
+    parser.add_argument("--bf16", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--fp16", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--device", type=str, default="cuda", help="auto|cuda|cpu")
+    parser.add_argument("--original_model_id", type=str, default=None, help="HF id/path of original pre-morph model")
+    parser.add_argument("--compare_ppl", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--ppl_dtype", type=str, default="bfloat16", choices=["bfloat16", "float16", "float32"])
+    parser.add_argument("--ppl_max_samples", type=int, default=256, help="Max raw text examples for PPL eval subset")
+    parser.add_argument("--ppl_batch_size", type=int, default=16)
+    parser.add_argument("--trust_remote_code", action=argparse.BooleanOptionalAction, default=True)
+    return parser.parse_args()
+
+
+def _get_dataset(args: argparse.Namespace):
+    if args.dataset_name:
+        dataset_config_name = args.dataset_config_name
+        if dataset_config_name is None:
+            if args.dataset_name == "allenai/c4":
+                dataset_config_name = "en"
+                print("dataset_config_name not provided for allenai/c4; defaulting to 'en'.")
+            elif args.dataset_name == "Salesforce/wikitext":
+                dataset_config_name = "wikitext-2-raw-v1"
+                print("dataset_config_name not provided for Salesforce/wikitext; defaulting to 'wikitext-2-raw-v1'.")
+
+        if dataset_config_name is not None:
+            return load_dataset(args.dataset_name, dataset_config_name, split=args.dataset_split)
+        return load_dataset(args.dataset_name, split=args.dataset_split)
+    if args.data_path:
+        return load_dataset("text", data_files={"train": args.data_path})["train"]
+    raise ValueError("Provide --dataset_name or --data_path")
+
+
+def _tokenize_and_group(dataset, tokenizer, block_size: int, text_column: str):
+    def tokenize_fn(batch):
+        return tokenizer(batch[text_column])
+
+    tokenized = dataset.map(tokenize_fn, batched=True, remove_columns=[text_column])
+
+    def group_texts(batch):
+        concatenated = {k: sum(batch[k], []) for k in batch.keys()}
+        total_len = (len(concatenated["input_ids"]) // block_size) * block_size
+        result = {
+            k: [vals[i : i + block_size] for i in range(0, total_len, block_size)]
+            for k, vals in concatenated.items()
+        }
+        result["labels"] = [x.copy() for x in result["input_ids"]]
+        return result
+
+    return tokenized.map(group_texts, batched=True)
+
+
+def _freeze_all(model):
+    for p in model.parameters():
+        p.requires_grad = False
+
+
+def _unfreeze_param(module):
+    for p in module.parameters():
+        p.requires_grad = True
+
+
+def _get_changed_layers(config) -> Dict[str, Iterable[int]]:
+    kv_list = getattr(config, "num_key_value_heads_per_layer", None)
+    mlp_list = getattr(config, "intermediate_size_per_layer", None)
+    base_kv = getattr(config, "base_num_key_value_heads", config.num_key_value_heads)
+    base_mlp = getattr(config, "base_intermediate_size", config.intermediate_size)
+
+    changed_kv = []
+    changed_mlp = []
+    if kv_list:
+        changed_kv = [i for i, kv in enumerate(kv_list) if kv != base_kv]
+    if mlp_list:
+        changed_mlp = [i for i, m in enumerate(mlp_list) if m != base_mlp]
+
+    return {"kv": changed_kv, "mlp": changed_mlp}
+
+
+def _set_phase1_requires_grad(model, config):
+    _freeze_all(model)
+    changed = _get_changed_layers(config)
+
+    for idx in changed["kv"]:
+        layer = model.model.layers[idx]
+        _unfreeze_param(layer.self_attn.k_proj)
+        _unfreeze_param(layer.self_attn.v_proj)
+
+    for idx in changed["mlp"]:
+        layer = model.model.layers[idx]
+        _unfreeze_param(layer.mlp.gate_proj)
+        _unfreeze_param(layer.mlp.up_proj)
+        _unfreeze_param(layer.mlp.down_proj)
+
+
+def _set_phase2_requires_grad(model):
+    for p in model.parameters():
+        p.requires_grad = True
+
+
+def _resolve_device(device_arg: str) -> str:
+    if device_arg == "auto":
+        return "cuda" if torch.cuda.is_available() else "cpu"
+    return device_arg
+
+
+def _materialize_known_meta_params(model) -> None:
+    meta_params = [name for name, p in model.named_parameters() if p.device.type == "meta"]
+    if not meta_params:
+        return
+
+    if meta_params == ["lm_head.weight"] and hasattr(model, "lm_head") and hasattr(model, "model") and hasattr(model.model, "embed_tokens"):
+        model.lm_head.weight = model.model.embed_tokens.weight
+        return
+
+    raise ValueError(f"Model has unresolved meta parameters: {meta_params}")
+
+
+def _prepare_train_dataset_for_torch(train_dataset):
+    return train_dataset.with_format("torch", columns=["input_ids", "labels"])
+
+
+def _collate_batch(examples):
+    return {
+        "input_ids": torch.stack([x["input_ids"] for x in examples], dim=0),
+        "labels": torch.stack([x["labels"] for x in examples], dim=0),
+    }
+
+
+def _run_phase_torch_loop(model, tokenizer, train_dataset, output_dir, args, learning_rate, max_steps):
+    os.makedirs(output_dir, exist_ok=True)
+    train_dataset = _prepare_train_dataset_for_torch(train_dataset)
+    dataloader = DataLoader(
+        train_dataset,
+        batch_size=args.per_device_train_batch_size,
+        shuffle=True,
+        collate_fn=_collate_batch,
+        drop_last=True,
+    )
+
+    trainable_params = [p for p in model.parameters() if p.requires_grad]
+    if not trainable_params:
+        raise ValueError("No trainable parameters found for this phase")
+
+    optimizer = torch.optim.AdamW(trainable_params, lr=learning_rate)
+
+    warmup_steps = max(0, args.warmup_steps)
+
+    def lr_lambda(step_idx: int) -> float:
+        if warmup_steps > 0 and step_idx < warmup_steps:
+            return float(step_idx + 1) / float(warmup_steps)
+        progress_denom = max(1, max_steps - warmup_steps)
+        progress = min(1.0, max(0.0, (step_idx - warmup_steps) / progress_denom))
+        return 0.5 * (1.0 + math.cos(math.pi * progress))
+
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_lambda)
+
+    use_cuda = next(model.parameters()).device.type == "cuda"
+    use_amp = use_cuda and (args.bf16 or args.fp16)
+    amp_dtype = torch.bfloat16 if args.bf16 else torch.float16
+    scaler = torch.cuda.amp.GradScaler(enabled=use_cuda and args.fp16)
+
+    model.train()
+    step = 0
+    data_iter = iter(dataloader)
+    while step < max_steps:
+        try:
+            batch = next(data_iter)
+        except StopIteration:
+            data_iter = iter(dataloader)
+            batch = next(data_iter)
+
+        batch = {k: v.to(next(model.parameters()).device) for k, v in batch.items()}
+        optimizer.zero_grad(set_to_none=True)
+
+        if use_amp:
+            with torch.autocast(device_type="cuda", dtype=amp_dtype):
+                loss = model(**batch).loss
+        else:
+            loss = model(**batch).loss
+
+        if scaler.is_enabled():
+            scaler.scale(loss).backward()
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(trainable_params, args.max_grad_norm)
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(trainable_params, args.max_grad_norm)
+            optimizer.step()
+
+        scheduler.step()
+        step += 1
+
+        if step % 10 == 0 or step == 1 or step == max_steps:
+            lr = scheduler.get_last_lr()[0]
+            print(f"step {step}/{max_steps} loss={loss.item():.4f} lr={lr:.6e}")
+
+    model.save_pretrained(output_dir)
+    tokenizer.save_pretrained(output_dir)
+
+
+def _run_phase(model, tokenizer, train_dataset, output_dir, args, learning_rate, max_steps):
+    try:
+        from transformers import Trainer, TrainingArguments
+
+        training_args = TrainingArguments(
+            output_dir=output_dir,
+            per_device_train_batch_size=args.per_device_train_batch_size,
+            learning_rate=learning_rate,
+            max_steps=max_steps,
+            warmup_steps=args.warmup_steps,
+            lr_scheduler_type="cosine",
+            max_grad_norm=args.max_grad_norm,
+            bf16=args.bf16,
+            fp16=args.fp16,
+            logging_steps=10,
+            save_steps=200,
+            save_total_limit=2,
+            report_to=[],
+        )
+
+        trainer = Trainer(model=model, args=training_args, train_dataset=train_dataset, tokenizer=tokenizer)
+        trainer.train()
+        trainer.save_model(output_dir)
+        tokenizer.save_pretrained(output_dir)
+    except Exception as exc:
+        print(f"Trainer unavailable ({type(exc).__name__}: {exc}); falling back to native torch loop.")
+        _run_phase_torch_loop(model, tokenizer, train_dataset, output_dir, args, learning_rate, max_steps)
+
+
+def main() -> None:
+    args = parse_args()
+    device = _resolve_device(args.device)
+
+    tokenizer = AutoTokenizer.from_pretrained(args.model_dir, trust_remote_code=args.trust_remote_code)
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model_dir,
+        trust_remote_code=args.trust_remote_code,
+        low_cpu_mem_usage=False,
+    )
+    _materialize_known_meta_params(model)
+    model = model.to(device)
+
+    dataset = _get_dataset(args)
+    train_dataset = _tokenize_and_group(dataset, tokenizer, args.block_size, args.text_column)
+
+    _set_phase1_requires_grad(model, model.config)
+    _run_phase(model, tokenizer, train_dataset, args.output_dir + "/phase1", args, args.learning_rate_phase1, args.max_steps_phase1)
+
+    _set_phase2_requires_grad(model)
+    _run_phase(model, tokenizer, train_dataset, args.output_dir + "/phase2", args, args.learning_rate_phase2, args.max_steps_phase2)
+
+    if args.compare_ppl:
+        run_ppl_comparison(
+            model_dir=args.model_dir,
+            output_dir=args.output_dir,
+            original_model_id=args.original_model_id,
+            dataset_name=args.dataset_name,
+            dataset_config_name=args.dataset_config_name,
+            dataset_split=args.dataset_split,
+            data_path=args.data_path,
+            text_column=args.text_column,
+            block_size=args.block_size,
+            device=args.device,
+            ppl_dtype=args.ppl_dtype,
+            ppl_max_samples=args.ppl_max_samples,
+            ppl_batch_size=args.ppl_batch_size,
+            trust_remote_code=args.trust_remote_code,
+        )
+
+
+if __name__ == "__main__":
+    main()
