@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Sanity checks for morphed Qwen3 IHA checkpoints."""
 from __future__ import annotations
 
 import argparse
 import torch
-from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoConfig, AutoModelForCausalLM
 
 
 def parse_args() -> argparse.Namespace:
@@ -21,28 +20,30 @@ def _dtype_from_arg(dtype: str):
 
 
 def _extract_layer_kv(past_key_values, layer_idx: int):
-    # Newer Transformers may return Cache-like objects with key_cache/value_cache lists.
     if hasattr(past_key_values, "key_cache") and hasattr(past_key_values, "value_cache"):
         return past_key_values.key_cache[layer_idx], past_key_values.value_cache[layer_idx]
-
     try:
         layer_entry = past_key_values[layer_idx]
     except TypeError:
-        # Some cache objects are iterable but not subscriptable (e.g., DynamicCache).
         layer_entry = list(past_key_values)[layer_idx]
-
-    # Legacy format is usually a tuple/list where first two entries are (k, v).
     if isinstance(layer_entry, (tuple, list)) and len(layer_entry) >= 2:
         return layer_entry[0], layer_entry[1]
-
     raise ValueError(f"Unsupported past_key_values layer format at index {layer_idx}: {type(layer_entry)}")
+
+
+def _materialize_known_meta_params(model) -> None:
+    meta_params = [name for name, param in model.named_parameters() if param.device.type == "meta"]
+    if not meta_params:
+        return
+    if meta_params == ["lm_head.weight"] and hasattr(model, "lm_head") and hasattr(model, "model") and hasattr(model.model, "embed_tokens"):
+        model.lm_head.weight = model.model.embed_tokens.weight
+        return
+    raise ValueError(f"Model has unresolved meta parameters: {meta_params}")
 
 
 def main() -> None:
     args = parse_args()
-    device = args.device
-    if device == "auto":
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = "cuda" if args.device == "auto" and torch.cuda.is_available() else ("cpu" if args.device == "auto" else args.device)
 
     config = AutoConfig.from_pretrained(args.model_dir, trust_remote_code=args.trust_remote_code)
     model = AutoModelForCausalLM.from_pretrained(
@@ -51,21 +52,12 @@ def main() -> None:
         low_cpu_mem_usage=False,
         trust_remote_code=args.trust_remote_code,
     )
-
-    meta_params = [name for name, param in model.named_parameters() if param.device.type == "meta"]
-    if meta_params:
-        if meta_params == ["lm_head.weight"] and hasattr(model, "lm_head") and hasattr(model, "model") and hasattr(model.model, "embed_tokens"):
-            model.lm_head.weight = model.model.embed_tokens.weight
-        else:
-            raise ValueError(f"Model has unresolved meta parameters: {meta_params}")
-
+    _materialize_known_meta_params(model)
     model = model.to(device)
-
     model.eval()
 
     vocab = config.vocab_size
-    batch = 2
-    seq = 8
+    batch, seq = 2, 8
     input_ids = torch.randint(low=0, high=vocab, size=(batch, seq), device=device)
 
     with torch.no_grad():
@@ -74,7 +66,6 @@ def main() -> None:
     logits = out.logits
     if logits.shape != (batch, seq, vocab):
         raise ValueError(f"Unexpected logits shape: {logits.shape}")
-
     if torch.isnan(logits).any():
         raise ValueError("NaNs in logits")
 
@@ -82,19 +73,25 @@ def main() -> None:
     if past is None:
         raise ValueError("past_key_values missing")
 
-    kv_list = getattr(config, "num_key_value_heads_per_layer", None)
-    head_dim = config.hidden_size // config.num_attention_heads
+    nkv_list = getattr(config, "num_key_value_heads_per_layer", None)
+    d_qk_list = getattr(config, "qk_head_dim_per_layer", None)
+    d_v_list = getattr(config, "v_head_dim_per_layer", None)
+
+    if d_qk_list is None:
+        inferred = getattr(config, "head_dim", config.hidden_size // config.num_attention_heads)
+        d_qk_list = [inferred] * config.num_hidden_layers
+    if d_v_list is None:
+        d_v_list = d_qk_list
 
     for i in range(len(past)):
         k, v = _extract_layer_kv(past, i)
-        if k.shape[-1] != head_dim or v.shape[-1] != head_dim:
-            raise ValueError(f"Layer {i} head_dim mismatch: {k.shape} {v.shape}")
-        if kv_list is not None:
-            expected_kv = kv_list[i]
-            if k.shape[1] != expected_kv:
-                raise ValueError(f"Layer {i} KV heads mismatch: {k.shape[1]} vs {expected_kv}")
+        if k.shape[-1] != int(d_qk_list[i]):
+            raise ValueError(f"Layer {i} K head_dim mismatch: {k.shape[-1]} vs {d_qk_list[i]}")
+        if v.shape[-1] != int(d_v_list[i]):
+            raise ValueError(f"Layer {i} V head_dim mismatch: {v.shape[-1]} vs {d_v_list[i]}")
+        if nkv_list is not None and k.shape[1] != int(nkv_list[i]):
+            raise ValueError(f"Layer {i} KV heads mismatch: {k.shape[1]} vs {nkv_list[i]}")
 
-    # Step decode with cache
     next_ids = torch.randint(low=0, high=vocab, size=(batch, 1), device=device)
     with torch.no_grad():
         out2 = model(next_ids, use_cache=True, past_key_values=past)
