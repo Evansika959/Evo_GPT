@@ -19,6 +19,9 @@
 
 # llm_morph local artifacts
 /llm_morph/__pycache__/
+/llm_morph/qwen3_morphing/__pycache__/
 /llm_morph/morphed_output/
 /llm_morph/qwen3_iha_uptrain/
 /llm_morph/qwen3_iha_uptrain_smoke/
+
+__pycache__/

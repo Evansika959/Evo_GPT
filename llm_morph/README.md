@@ -13,14 +13,12 @@ pip install "transformers>=4.49.0" datasets torch
 ## Example schedule
 
 ```bash
-cat > examples/schedule.json << 'EOF'
-{
-  "num_query_heads_per_layer": [16,16,16,16,16,16,16,16,16,16,16,16],
-  "num_key_value_heads_per_layer": [8,8,8,8,8,8,8,4,4,4,2,2],
-  "qk_head_dim_per_layer": [128,128,128,128,128,128,128,128,128,128,128,128],
-  "v_head_dim_per_layer": [128,128,128,128,128,128,128,128,128,128,128,128],
-  "intermediate_size_per_layer": [4096,4096,4096,4096,4096,4096,6144,6144,6144,6144,6144,6144]
-}
+cat > examples/schedule.yaml << 'EOF'
+num_query_heads_per_layer: [16,16,16,16,16,16,16,16,16,16,16,16]
+num_key_value_heads_per_layer: [8,8,8,8,8,8,8,4,4,4,2,2]
+qk_head_dim_per_layer: [128,128,128,128,128,128,128,128,128,128,128,128]
+v_head_dim_per_layer: [128,128,128,128,128,128,128,128,128,128,128,128]
+intermediate_size_per_layer: [4096,4096,4096,4096,4096,4096,6144,6144,6144,6144,6144,6144]
 EOF
 ```
 
@@ -30,7 +28,7 @@ EOF
 python3 -m qwen3_morphing.morph_qwen3 \
   --model_id Qwen/Qwen3-1.7B \
   --out_dir ./morphed_output \
-  --schedule examples/schedule.json
+  --schedule examples/schedule.yaml
 ```
 
 ## Verify shapes and cache

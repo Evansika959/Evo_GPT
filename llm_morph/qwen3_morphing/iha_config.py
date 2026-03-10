@@ -4,6 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 import json
+import os
+import yaml
 
 
 @dataclass
@@ -88,11 +90,15 @@ def build_default_schedule(
 
 
 def load_schedule(path: str) -> IHASchedule:
+    ext = os.path.splitext(path)[1].lower()
     with open(path, "r", encoding="utf-8") as f:
-        raw = json.load(f)
+        if ext in (".yaml", ".yml"):
+            raw = yaml.safe_load(f)
+        else:
+            raw = json.load(f)
 
     if not isinstance(raw, dict):
-        raise ValueError("Schedule JSON must be an object")
+        raise ValueError("Schedule file must be a mapping/object")
 
     # Backward compatible: infer missing fields from legacy schedule.
     kv = raw.get("num_key_value_heads_per_layer")
@@ -102,7 +108,7 @@ def load_schedule(path: str) -> IHASchedule:
     d_v = raw.get("v_head_dim_per_layer")
 
     if not isinstance(kv, list) or not isinstance(mlp, list):
-        raise ValueError("Schedule JSON must include list fields for KV heads and MLP sizes")
+        raise ValueError("Schedule file must include list fields for KV heads and MLP sizes")
 
     if nq is None:
         # temporary placeholder; caller should overwrite when using defaults from base config.
@@ -129,6 +135,10 @@ def save_schedule(path: str, schedule: IHASchedule) -> None:
         "v_head_dim_per_layer": schedule.v_head_dim_per_layer,
         "intermediate_size_per_layer": schedule.intermediate_size_per_layer,
     }
+    ext = os.path.splitext(path)[1].lower()
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2)
-        f.write("\n")
+        if ext in (".yaml", ".yml"):
+            yaml.safe_dump(payload, f, sort_keys=False)
+        else:
+            json.dump(payload, f, indent=2)
+            f.write("\n")

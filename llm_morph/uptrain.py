@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import inspect
 import math
 import os
 from typing import Iterable, Dict, Any
@@ -28,15 +29,24 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--per_device_train_batch_size", type=int, default=1)
     parser.add_argument("--learning_rate_phase1", type=float, default=1e-5)
     parser.add_argument("--learning_rate_phase2", type=float, default=5e-6)
-    parser.add_argument("--max_steps_phase1", type=int, default=200)
-    parser.add_argument("--max_steps_phase2", type=int, default=800)
+    parser.add_argument(
+        "--max_steps_phase1",
+        type=int,
+        default=None,
+        help="Phase 1 max steps. If unset, runs one full pass (1 epoch) over the training dataset.",
+    )
+    parser.add_argument(
+        "--max_steps_phase2",
+        type=int,
+        default=None,
+        help="Phase 2 max steps. If unset, runs one full pass (1 epoch) over the training dataset.",
+    )
     parser.add_argument("--warmup_steps", type=int, default=50)
     parser.add_argument("--max_grad_norm", type=float, default=1.0)
     parser.add_argument("--bf16", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--fp16", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--device", type=str, default="cuda", help="auto|cuda|cpu")
     parser.add_argument("--original_model_id", type=str, default=None, help="HF id/path of original pre-morph model")
-    parser.add_argument("--compare_ppl", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--ppl_dtype", type=str, default="bfloat16", choices=["bfloat16", "float16", "float32"])
     parser.add_argument("--ppl_max_samples", type=int, default=256, help="Max raw text examples for PPL eval subset")
     parser.add_argument("--ppl_batch_size", type=int, default=16)
@@ -54,6 +64,8 @@ def _get_dataset(args: argparse.Namespace):
             elif args.dataset_name == "Salesforce/wikitext":
                 dataset_config_name = "wikitext-2-raw-v1"
                 print("dataset_config_name not provided for Salesforce/wikitext; defaulting to 'wikitext-2-raw-v1'.")
+            elif args.dataset_name == "openwebtext":
+                dataset_config_name = None
 
         if dataset_config_name is not None:
             return load_dataset(args.dataset_name, dataset_config_name, split=args.dataset_split)
@@ -158,7 +170,7 @@ def _collate_batch(examples):
     }
 
 
-def _run_phase_torch_loop(model, tokenizer, train_dataset, output_dir, args, learning_rate, max_steps):
+def _run_phase_torch_loop(model, tokenizer, train_dataset, output_dir, args, learning_rate, max_steps: int | None):
     os.makedirs(output_dir, exist_ok=True)
     train_dataset = _prepare_train_dataset_for_torch(train_dataset)
     dataloader = DataLoader(
@@ -175,12 +187,16 @@ def _run_phase_torch_loop(model, tokenizer, train_dataset, output_dir, args, lea
 
     optimizer = torch.optim.AdamW(trainable_params, lr=learning_rate)
 
-    warmup_steps = max(0, args.warmup_steps)
+    total_steps = int(max_steps) if max_steps is not None else len(dataloader)
+    if total_steps <= 0:
+        raise ValueError("No training steps available for this phase")
+
+    warmup_steps = max(0, min(args.warmup_steps, total_steps))
 
     def lr_lambda(step_idx: int) -> float:
         if warmup_steps > 0 and step_idx < warmup_steps:
             return float(step_idx + 1) / float(warmup_steps)
-        progress_denom = max(1, max_steps - warmup_steps)
+        progress_denom = max(1, total_steps - warmup_steps)
         progress = min(1.0, max(0.0, (step_idx - warmup_steps) / progress_denom))
         return 0.5 * (1.0 + math.cos(math.pi * progress))
 
@@ -189,12 +205,12 @@ def _run_phase_torch_loop(model, tokenizer, train_dataset, output_dir, args, lea
     use_cuda = next(model.parameters()).device.type == "cuda"
     use_amp = use_cuda and (args.bf16 or args.fp16)
     amp_dtype = torch.bfloat16 if args.bf16 else torch.float16
-    scaler = torch.cuda.amp.GradScaler(enabled=use_cuda and args.fp16)
+    scaler = torch.amp.GradScaler(enabled=use_cuda and args.fp16)
 
     model.train()
     step = 0
     data_iter = iter(dataloader)
-    while step < max_steps:
+    while step < total_steps:
         try:
             batch = next(data_iter)
         except StopIteration:
@@ -224,23 +240,22 @@ def _run_phase_torch_loop(model, tokenizer, train_dataset, output_dir, args, lea
         scheduler.step()
         step += 1
 
-        if step % 10 == 0 or step == 1 or step == max_steps:
+        if step % 10 == 0 or step == 1 or step == total_steps:
             lr = scheduler.get_last_lr()[0]
-            print(f"step {step}/{max_steps} loss={loss.item():.4f} lr={lr:.6e}")
+            print(f"step {step}/{total_steps} loss={loss.item():.4f} lr={lr:.6e}")
 
     model.save_pretrained(output_dir)
     tokenizer.save_pretrained(output_dir)
 
 
-def _run_phase(model, tokenizer, train_dataset, output_dir, args, learning_rate, max_steps):
+def _run_phase(model, tokenizer, train_dataset, output_dir, args, learning_rate, max_steps: int | None):
     try:
         from transformers import Trainer, TrainingArguments
 
-        training_args = TrainingArguments(
+        training_args_kwargs = dict(
             output_dir=output_dir,
             per_device_train_batch_size=args.per_device_train_batch_size,
             learning_rate=learning_rate,
-            max_steps=max_steps,
             warmup_steps=args.warmup_steps,
             lr_scheduler_type="cosine",
             max_grad_norm=args.max_grad_norm,
@@ -251,8 +266,25 @@ def _run_phase(model, tokenizer, train_dataset, output_dir, args, learning_rate,
             save_total_limit=2,
             report_to=[],
         )
+        if max_steps is None:
+            training_args_kwargs["num_train_epochs"] = 1.0
+        else:
+            training_args_kwargs["max_steps"] = max_steps
 
-        trainer = Trainer(model=model, args=training_args, train_dataset=train_dataset, tokenizer=tokenizer)
+        training_args = TrainingArguments(**training_args_kwargs)
+
+        trainer_kwargs = {
+            "model": model,
+            "args": training_args,
+            "train_dataset": train_dataset,
+        }
+        trainer_signature = inspect.signature(Trainer.__init__).parameters
+        if "tokenizer" in trainer_signature:
+            trainer_kwargs["tokenizer"] = tokenizer
+        elif "processing_class" in trainer_signature:
+            trainer_kwargs["processing_class"] = tokenizer
+
+        trainer = Trainer(**trainer_kwargs)
         trainer.train()
         trainer.save_model(output_dir)
         tokenizer.save_pretrained(output_dir)
@@ -282,25 +314,6 @@ def main() -> None:
 
     _set_phase2_requires_grad(model)
     _run_phase(model, tokenizer, train_dataset, args.output_dir + "/phase2", args, args.learning_rate_phase2, args.max_steps_phase2)
-
-    if args.compare_ppl:
-        run_ppl_comparison(
-            model_dir=args.model_dir,
-            output_dir=args.output_dir,
-            original_model_id=args.original_model_id,
-            dataset_name=args.dataset_name,
-            dataset_config_name=args.dataset_config_name,
-            dataset_split=args.dataset_split,
-            data_path=args.data_path,
-            text_column=args.text_column,
-            block_size=args.block_size,
-            device=args.device,
-            ppl_dtype=args.ppl_dtype,
-            ppl_max_samples=args.ppl_max_samples,
-            ppl_batch_size=args.ppl_batch_size,
-            trust_remote_code=args.trust_remote_code,
-        )
-
 
 if __name__ == "__main__":
     main()

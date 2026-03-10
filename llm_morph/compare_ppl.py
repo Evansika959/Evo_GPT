@@ -19,7 +19,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--original_model_id", type=str, default=None, help="HF id/path of original pre-morph model")
     parser.add_argument("--dataset_name", type=str, default="Salesforce/wikitext")
     parser.add_argument("--dataset_config_name", type=str, default=None)
-    parser.add_argument("--dataset_split", type=str, default="train")
+    parser.add_argument("--dataset_split", type=str, default="test")
     parser.add_argument("--data_path", type=str, default=None)
     parser.add_argument("--text_column", type=str, default="text")
     parser.add_argument("--block_size", type=int, default=1024)
@@ -269,6 +269,7 @@ def run_ppl_comparison(
 
     size_stats = {}
     kv_stats = {}
+    ppl_stats = {}
 
     for label, model_path in model_specs:
         if _looks_like_local_path(model_path) and not os.path.isdir(model_path):
@@ -280,6 +281,7 @@ def run_ppl_comparison(
         kv_token_bytes, kv_4k_mib = _kv_cache_usage_stats(model.config, eval_dtype, context_len=4096)
         kv_stats[label] = (kv_token_bytes, kv_4k_mib)
         ppl = _compute_perplexity(model, eval_dataset, resolved_device, ppl_batch_size, eval_dtype)
+        ppl_stats[label] = ppl
         print(
             f"{label:9s} PPL: {ppl:.4f} | params={_format_params_short(params)} ({params:,}) "
             f"| est_weight_mem={est_mib:.2f} MiB | kv_cache={kv_token_bytes:,} B/token, {kv_4k_mib:.2f} MiB@4k ({model_path})"
@@ -288,27 +290,28 @@ def run_ppl_comparison(
         if resolved_device == "cuda":
             torch.cuda.empty_cache()
 
-    if "original" in size_stats and "morphed" in size_stats:
-        orig_params, orig_mib = size_stats["original"]
-        morph_params, morph_mib = size_stats["morphed"]
-        morph_pct = (morph_params / orig_params * 100.0) if orig_params > 0 else float("nan")
-        print("\n--- Morph Size Summary ---")
-        print(
-            f"before morph (original): params={_format_params_short(orig_params)} ({orig_params:,}), "
-            f"est_weight_mem={orig_mib:.2f} MiB"
-        )
-        print(
-            f"after morph  (morphed):  params={_format_params_short(morph_params)} ({morph_params:,}), "
-            f"est_weight_mem={morph_mib:.2f} MiB"
-        )
-        print(f"morphed/original: {morph_pct:.2f}%")
-
-    if "original" in kv_stats and "morphed" in kv_stats:
-        orig_kv_bpt, orig_kv_4k_mib = kv_stats["original"]
-        morph_kv_bpt, morph_kv_4k_mib = kv_stats["morphed"]
-        print("\n--- KV Cache Summary ---")
-        print(f"before morph (original): kv_cache={orig_kv_bpt:,} B/token, {orig_kv_4k_mib:.2f} MiB@4k")
-        print(f"after morph  (morphed):  kv_cache={morph_kv_bpt:,} B/token, {morph_kv_4k_mib:.2f} MiB@4k")
+    labels_in_order = [
+        label
+        for label, _ in model_specs
+        if label != "morphed" and label in size_stats and label in kv_stats and label in ppl_stats
+    ]
+    if labels_in_order:
+        print("\n--- Morphing&Uptraining Result Summary ---")
+        for label in labels_in_order:
+            params, est_mib = size_stats[label]
+            kv_bpt, kv_4k_mib = kv_stats[label]
+            ppl = ppl_stats[label]
+            print(
+                f"{label:9s} | PPL={ppl:.4f} | params={_format_params_short(params)} ({params:,}) "
+                f"| est_weight_mem={est_mib:.2f} MiB | kv_cache={kv_bpt:,} B/token, {kv_4k_mib:.2f} MiB@4k"
+            )
+            
+    if "original" in size_stats and "uptrained" in size_stats:
+        original_params, _ = size_stats["original"]
+        uptrained_params, _ = size_stats["uptrained"]
+        if original_params > 0:
+            savings_pct = (1.0 - (uptrained_params / original_params)) * 100.0
+            print(f"\n{savings_pct:.2f}% savings in model size")
 
     print("=== End PPL Comparison ===\n")
 

@@ -180,6 +180,8 @@ def main() -> None:
         trust_remote_code=args.trust_remote_code,
     )
     tokenizer = AutoTokenizer.from_pretrained(args.model_id, trust_remote_code=args.trust_remote_code)
+    
+    print(f"base model config: {base_config}")
 
     num_layers = base_config.num_hidden_layers
     base_nq = int(base_config.num_attention_heads)
@@ -270,6 +272,8 @@ def main() -> None:
     new_model.save_pretrained(args.out_dir, safe_serialization=args.save_safetensors)
     new_config.save_pretrained(args.out_dir)
     tokenizer.save_pretrained(args.out_dir)
+    
+    print(f"New config: {new_config}")
 
     src_dir = os.path.dirname(__file__)
     for filename in ("configuration_qwen3_iha.py", "modeling_qwen3_iha.py"):

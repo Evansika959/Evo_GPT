@@ -1,0 +1,57 @@
+[
+  {
+    "benchmark": "arc-easy",
+    "split": "validation",
+    "total": 570,
+    "correct": 204,
+    "accuracy": 0.35789473684210527,
+    "skipped": 0,
+    "block_size": 40960,
+    "length_norm": true,
+    "model_dir": "./qwen3_iha_uptrain/phase2"
+  },
+  {
+    "benchmark": "arc-challenge",
+    "split": "validation",
+    "total": 299,
+    "correct": 82,
+    "accuracy": 0.27424749163879597,
+    "skipped": 0,
+    "block_size": 40960,
+    "length_norm": true,
+    "model_dir": "./qwen3_iha_uptrain/phase2"
+  },
+  {
+    "benchmark": "sciq",
+    "split": "validation",
+    "total": 1000,
+    "correct": 417,
+    "accuracy": 0.417,
+    "skipped": 0,
+    "block_size": 40960,
+    "length_norm": true,
+    "model_dir": "./qwen3_iha_uptrain/phase2"
+  },
+  {
+    "benchmark": "winogrande",
+    "split": "validation",
+    "total": 1267,
+    "correct": 643,
+    "accuracy": 0.5074980268350434,
+    "skipped": 0,
+    "block_size": 40960,
+    "length_norm": true,
+    "model_dir": "./qwen3_iha_uptrain/phase2"
+  },
+  {
+    "benchmark": "boolq",
+    "split": "validation",
+    "total": 3270,
+    "correct": 1909,
+    "accuracy": 0.5837920489296636,
+    "skipped": 0,
+    "block_size": 40960,
+    "length_norm": true,
+    "model_dir": "./qwen3_iha_uptrain/phase2"
+  }
+]
