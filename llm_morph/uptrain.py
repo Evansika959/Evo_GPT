@@ -6,14 +6,13 @@ import argparse
 import inspect
 import math
 import os
-from typing import Iterable, Dict, Any
+from typing import Iterable, Dict
 
 import torch
 from datasets import load_dataset
 from torch.utils.data import DataLoader
+from tqdm.auto import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer
-
-from compare_ppl import run_ppl_comparison
 
 
 def parse_args() -> argparse.Namespace:
@@ -26,7 +25,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--data_path", type=str, default=None)
     parser.add_argument("--text_column", type=str, default="text")
     parser.add_argument("--block_size", type=int, default=1024)
-    parser.add_argument("--per_device_train_batch_size", type=int, default=1)
+    parser.add_argument("--per_device_train_batch_size", type=int, default=8)
     parser.add_argument("--learning_rate_phase1", type=float, default=1e-5)
     parser.add_argument("--learning_rate_phase2", type=float, default=5e-6)
     parser.add_argument(
@@ -46,10 +45,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--bf16", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--fp16", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--device", type=str, default="cuda", help="auto|cuda|cpu")
-    parser.add_argument("--original_model_id", type=str, default=None, help="HF id/path of original pre-morph model")
-    parser.add_argument("--ppl_dtype", type=str, default="bfloat16", choices=["bfloat16", "float16", "float32"])
-    parser.add_argument("--ppl_max_samples", type=int, default=256, help="Max raw text examples for PPL eval subset")
-    parser.add_argument("--ppl_batch_size", type=int, default=16)
     parser.add_argument("--trust_remote_code", action=argparse.BooleanOptionalAction, default=True)
     return parser.parse_args()
 
@@ -170,7 +165,16 @@ def _collate_batch(examples):
     }
 
 
-def _run_phase_torch_loop(model, tokenizer, train_dataset, output_dir, args, learning_rate, max_steps: int | None):
+def _run_phase_torch_loop(
+    model,
+    tokenizer,
+    train_dataset,
+    output_dir,
+    args,
+    learning_rate,
+    max_steps: int | None,
+    phase_name: str,
+):
     os.makedirs(output_dir, exist_ok=True)
     train_dataset = _prepare_train_dataset_for_torch(train_dataset)
     dataloader = DataLoader(
@@ -197,8 +201,8 @@ def _run_phase_torch_loop(model, tokenizer, train_dataset, output_dir, args, lea
         if warmup_steps > 0 and step_idx < warmup_steps:
             return float(step_idx + 1) / float(warmup_steps)
         progress_denom = max(1, total_steps - warmup_steps)
-        progress = min(1.0, max(0.0, (step_idx - warmup_steps) / progress_denom))
-        return 0.5 * (1.0 + math.cos(math.pi * progress))
+        progress_ratio = min(1.0, max(0.0, (step_idx - warmup_steps) / progress_denom))
+        return 0.5 * (1.0 + math.cos(math.pi * progress_ratio))
 
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_lambda)
 
@@ -210,6 +214,8 @@ def _run_phase_torch_loop(model, tokenizer, train_dataset, output_dir, args, lea
     model.train()
     step = 0
     data_iter = iter(dataloader)
+    model_device = next(model.parameters()).device
+    progress = tqdm(total=total_steps, desc=phase_name, dynamic_ncols=True)
     while step < total_steps:
         try:
             batch = next(data_iter)
@@ -217,7 +223,7 @@ def _run_phase_torch_loop(model, tokenizer, train_dataset, output_dir, args, lea
             data_iter = iter(dataloader)
             batch = next(data_iter)
 
-        batch = {k: v.to(next(model.parameters()).device) for k, v in batch.items()}
+        batch = {k: v.to(model_device) for k, v in batch.items()}
         optimizer.zero_grad(set_to_none=True)
 
         if use_amp:
@@ -239,18 +245,32 @@ def _run_phase_torch_loop(model, tokenizer, train_dataset, output_dir, args, lea
 
         scheduler.step()
         step += 1
+        progress.update(1)
 
         if step % 10 == 0 or step == 1 or step == total_steps:
             lr = scheduler.get_last_lr()[0]
-            print(f"step {step}/{total_steps} loss={loss.item():.4f} lr={lr:.6e}")
+            progress.set_postfix(lr=f"{lr:.2e}", step=f"{step}/{total_steps}")
+
+    progress.close()
 
     model.save_pretrained(output_dir)
     tokenizer.save_pretrained(output_dir)
 
 
-def _run_phase(model, tokenizer, train_dataset, output_dir, args, learning_rate, max_steps: int | None):
+def _run_phase(
+    model,
+    tokenizer,
+    train_dataset,
+    output_dir,
+    args,
+    learning_rate,
+    max_steps: int | None,
+    phase_name: str,
+):
+    print(f"\n===== {phase_name} =====")
     try:
         from transformers import Trainer, TrainingArguments
+        from transformers.trainer_callback import PrinterCallback, ProgressCallback
 
         training_args_kwargs = dict(
             output_dir=output_dir,
@@ -262,9 +282,11 @@ def _run_phase(model, tokenizer, train_dataset, output_dir, args, learning_rate,
             bf16=args.bf16,
             fp16=args.fp16,
             logging_steps=10,
-            save_steps=200,
+            save_steps=50000,
             save_total_limit=2,
             report_to=[],
+            disable_tqdm=False,
+            run_name=phase_name,
         )
         if max_steps is None:
             training_args_kwargs["num_train_epochs"] = 1.0
@@ -285,12 +307,14 @@ def _run_phase(model, tokenizer, train_dataset, output_dir, args, learning_rate,
             trainer_kwargs["processing_class"] = tokenizer
 
         trainer = Trainer(**trainer_kwargs)
+        trainer.remove_callback(PrinterCallback)
+        trainer.add_callback(ProgressCallback)
         trainer.train()
         trainer.save_model(output_dir)
         tokenizer.save_pretrained(output_dir)
     except Exception as exc:
         print(f"Trainer unavailable ({type(exc).__name__}: {exc}); falling back to native torch loop.")
-        _run_phase_torch_loop(model, tokenizer, train_dataset, output_dir, args, learning_rate, max_steps)
+        _run_phase_torch_loop(model, tokenizer, train_dataset, output_dir, args, learning_rate, max_steps, phase_name)
 
 
 def main() -> None:
@@ -310,10 +334,28 @@ def main() -> None:
     train_dataset = _tokenize_and_group(dataset, tokenizer, args.block_size, args.text_column)
 
     _set_phase1_requires_grad(model, model.config)
-    _run_phase(model, tokenizer, train_dataset, args.output_dir + "/phase1", args, args.learning_rate_phase1, args.max_steps_phase1)
+    _run_phase(
+        model,
+        tokenizer,
+        train_dataset,
+        args.output_dir + "/phase1",
+        args,
+        args.learning_rate_phase1,
+        args.max_steps_phase1,
+        "Phase 1",
+    )
 
     _set_phase2_requires_grad(model)
-    _run_phase(model, tokenizer, train_dataset, args.output_dir + "/phase2", args, args.learning_rate_phase2, args.max_steps_phase2)
+    _run_phase(
+        model,
+        tokenizer,
+        train_dataset,
+        args.output_dir + "/phase2",
+        args,
+        args.learning_rate_phase2,
+        args.max_steps_phase2,
+        "Phase 2",
+    )
 
 if __name__ == "__main__":
     main()

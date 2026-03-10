@@ -1,0 +1,628 @@
+results:
+  arc_challenge:
+    alias: arc_challenge
+    acc,none: 0.33447098976109213
+    acc_stderr,none: 0.013787460322441368
+    acc_norm,none: 0.3677474402730375
+    acc_norm_stderr,none: 0.01409099561816847
+  arc_easy:
+    alias: arc_easy
+    acc,none: 0.664983164983165
+    acc_stderr,none: 0.009685160765932357
+    acc_norm,none: 0.6254208754208754
+    acc_norm_stderr,none: 0.00993175882041062
+  boolq:
+    alias: boolq
+    acc,none: 0.5978593272171254
+    acc_stderr,none: 0.008575926383211252
+  hellaswag:
+    alias: hellaswag
+    acc,none: 0.39842660824536946
+    acc_stderr,none: 0.004885735963346905
+    acc_norm,none: 0.5048795060744872
+    acc_norm_stderr,none: 0.004989543796593291
+  sciq:
+    alias: sciq
+    acc,none: 0.888
+    acc_stderr,none: 0.009977753031397234
+    acc_norm,none: 0.837
+    acc_norm_stderr,none: 0.01168621271274684
+  winogrande:
+    alias: winogrande
+    acc,none: 0.5414364640883977
+    acc_stderr,none: 0.01400414685379191
+group_subtasks:
+  hellaswag: []
+  arc_easy: []
+  arc_challenge: []
+  sciq: []
+  winogrande: []
+  boolq: []
+configs:
+  arc_challenge:
+    task: arc_challenge
+    tag:
+    - ai2_arc
+    dataset_path: allenai/ai2_arc
+    dataset_name: ARC-Challenge
+    training_split: train
+    validation_split: validation
+    test_split: test
+    doc_to_text: 'Question: {{question}}
+
+      Answer:'
+    doc_to_target: '{{choices.label.index(answerKey)}}'
+    unsafe_code: false
+    doc_to_choice: '{{choices.text}}'
+    description: ''
+    target_delimiter: ' '
+    fewshot_delimiter: '
+
+
+      '
+    fewshot_config:
+      sampler: default
+      split: null
+      process_docs: null
+      fewshot_indices: null
+      samples: null
+      doc_to_text: 'Question: {{question}}
+
+        Answer:'
+      doc_to_choice: '{{choices.text}}'
+      doc_to_target: '{{choices.label.index(answerKey)}}'
+      gen_prefix: null
+      fewshot_delimiter: '
+
+
+        '
+      target_delimiter: ' '
+    num_fewshot: 0
+    metric_list:
+    - metric: acc
+      aggregation: mean
+      higher_is_better: true
+    - metric: acc_norm
+      aggregation: mean
+      higher_is_better: true
+    output_type: multiple_choice
+    repeats: 1
+    should_decontaminate: true
+    doc_to_decontamination_query: 'Question: {{question}}
+
+      Answer:'
+    metadata:
+      version: 1.0
+      pretrained: ./qwen3_iha_uptrain/phase2
+      dtype: bfloat16
+      trust_remote_code: true
+      device: cuda
+  arc_easy:
+    task: arc_easy
+    tag:
+    - ai2_arc
+    dataset_path: allenai/ai2_arc
+    dataset_name: ARC-Easy
+    training_split: train
+    validation_split: validation
+    test_split: test
+    doc_to_text: 'Question: {{question}}
+
+      Answer:'
+    doc_to_target: '{{choices.label.index(answerKey)}}'
+    unsafe_code: false
+    doc_to_choice: '{{choices.text}}'
+    description: ''
+    target_delimiter: ' '
+    fewshot_delimiter: '
+
+
+      '
+    fewshot_config:
+      sampler: default
+      split: null
+      process_docs: null
+      fewshot_indices: null
+      samples: null
+      doc_to_text: 'Question: {{question}}
+
+        Answer:'
+      doc_to_choice: '{{choices.text}}'
+      doc_to_target: '{{choices.label.index(answerKey)}}'
+      gen_prefix: null
+      fewshot_delimiter: '
+
+
+        '
+      target_delimiter: ' '
+    num_fewshot: 0
+    metric_list:
+    - metric: acc
+      aggregation: mean
+      higher_is_better: true
+    - metric: acc_norm
+      aggregation: mean
+      higher_is_better: true
+    output_type: multiple_choice
+    repeats: 1
+    should_decontaminate: true
+    doc_to_decontamination_query: 'Question: {{question}}
+
+      Answer:'
+    metadata:
+      version: 1.0
+      pretrained: ./qwen3_iha_uptrain/phase2
+      dtype: bfloat16
+      trust_remote_code: true
+      device: cuda
+  boolq:
+    task: boolq
+    tag:
+    - super-glue-lm-eval-v1
+    dataset_path: aps/super_glue
+    dataset_name: boolq
+    training_split: train
+    validation_split: validation
+    doc_to_text: '{{passage}}
+
+      Question: {{question}}?
+
+      Answer:'
+    doc_to_target: label
+    unsafe_code: false
+    doc_to_choice:
+    - 'no'
+    - 'yes'
+    description: ''
+    target_delimiter: ' '
+    fewshot_delimiter: '
+
+
+      '
+    fewshot_config:
+      sampler: default
+      split: null
+      process_docs: null
+      fewshot_indices: null
+      samples: null
+      doc_to_text: '{{passage}}
+
+        Question: {{question}}?
+
+        Answer:'
+      doc_to_choice:
+      - 'no'
+      - 'yes'
+      doc_to_target: label
+      gen_prefix: null
+      fewshot_delimiter: '
+
+
+        '
+      target_delimiter: ' '
+    num_fewshot: 0
+    metric_list:
+    - metric: acc
+    output_type: multiple_choice
+    repeats: 1
+    should_decontaminate: true
+    doc_to_decontamination_query: passage
+    metadata:
+      version: 2.0
+      pretrained: ./qwen3_iha_uptrain/phase2
+      dtype: bfloat16
+      trust_remote_code: true
+      device: cuda
+  hellaswag:
+    task: hellaswag
+    tag:
+    - multiple_choice
+    dataset_path: Rowan/hellaswag
+    training_split: train
+    validation_split: validation
+    process_docs: "def process_docs(dataset: datasets.Dataset) -> datasets.Dataset:\n\
+      \    def _process_doc(doc):\n        ctx = doc[\"ctx_a\"] + \" \" + doc[\"ctx_b\"\
+      ].capitalize()\n        out_doc = {\n            \"query\": preprocess(doc[\"\
+      activity_label\"] + \": \" + ctx),\n            \"choices\": [preprocess(ending)\
+      \ for ending in doc[\"endings\"]],\n            \"gold\": int(doc[\"label\"\
+      ]),\n        }\n        return out_doc\n\n    return dataset.map(_process_doc)\n"
+    doc_to_text: '{{query}}'
+    doc_to_target: '{{label}}'
+    unsafe_code: false
+    doc_to_choice: choices
+    description: ''
+    target_delimiter: ' '
+    fewshot_delimiter: '
+
+
+      '
+    fewshot_config:
+      sampler: default
+      split: null
+      process_docs: <function process_docs at 0x787e1ced13f0>
+      fewshot_indices: null
+      samples: null
+      doc_to_text: '{{query}}'
+      doc_to_choice: choices
+      doc_to_target: '{{label}}'
+      gen_prefix: null
+      fewshot_delimiter: '
+
+
+        '
+      target_delimiter: ' '
+    num_fewshot: 0
+    metric_list:
+    - metric: acc
+      aggregation: mean
+      higher_is_better: true
+    - metric: acc_norm
+      aggregation: mean
+      higher_is_better: true
+    output_type: multiple_choice
+    repeats: 1
+    should_decontaminate: false
+    metadata:
+      version: 1.0
+      pretrained: ./qwen3_iha_uptrain/phase2
+      dtype: bfloat16
+      trust_remote_code: true
+      device: cuda
+  sciq:
+    task: sciq
+    dataset_path: allenai/sciq
+    training_split: train
+    validation_split: validation
+    test_split: test
+    doc_to_text: '{{support.lstrip()}}
+
+      Question: {{question}}
+
+      Answer:'
+    doc_to_target: 3
+    unsafe_code: false
+    doc_to_choice: '{{[distractor1, distractor2, distractor3, correct_answer]}}'
+    description: ''
+    target_delimiter: ' '
+    fewshot_delimiter: '
+
+
+      '
+    fewshot_config:
+      sampler: default
+      split: null
+      process_docs: null
+      fewshot_indices: null
+      samples: null
+      doc_to_text: '{{support.lstrip()}}
+
+        Question: {{question}}
+
+        Answer:'
+      doc_to_choice: '{{[distractor1, distractor2, distractor3, correct_answer]}}'
+      doc_to_target: 3
+      gen_prefix: null
+      fewshot_delimiter: '
+
+
+        '
+      target_delimiter: ' '
+    num_fewshot: 0
+    metric_list:
+    - metric: acc
+      aggregation: mean
+      higher_is_better: true
+    - metric: acc_norm
+      aggregation: mean
+      higher_is_better: true
+    output_type: multiple_choice
+    repeats: 1
+    should_decontaminate: true
+    doc_to_decontamination_query: '{{support}} {{question}}'
+    metadata:
+      version: 1.0
+      pretrained: ./qwen3_iha_uptrain/phase2
+      dtype: bfloat16
+      trust_remote_code: true
+      device: cuda
+  winogrande:
+    task: winogrande
+    dataset_path: allenai/winogrande
+    dataset_name: winogrande_xl
+    training_split: train
+    validation_split: validation
+    doc_to_text: "def doc_to_text(doc):\n    answer_to_num = {\"1\": 0, \"2\": 1}\n\
+      \    return answer_to_num[doc[\"answer\"]]\n"
+    doc_to_target: "def doc_to_target(doc):\n    idx = doc[\"sentence\"].index(\"\
+      _\") + 1\n    return doc[\"sentence\"][idx:].strip()\n"
+    unsafe_code: false
+    doc_to_choice: "def doc_to_choice(doc):\n    idx = doc[\"sentence\"].index(\"\
+      _\")\n    options = [doc[\"option1\"], doc[\"option2\"]]\n    return [doc[\"\
+      sentence\"][:idx] + opt for opt in options]\n"
+    description: ''
+    target_delimiter: ' '
+    fewshot_delimiter: '
+
+
+      '
+    fewshot_config:
+      sampler: default
+      split: null
+      process_docs: null
+      fewshot_indices: null
+      samples: null
+      doc_to_text: <function doc_to_text at 0x787d1f2549d0>
+      doc_to_choice: <function doc_to_choice at 0x787d1f2551b0>
+      doc_to_target: <function doc_to_target at 0x787d1f254f70>
+      gen_prefix: null
+      fewshot_delimiter: '
+
+
+        '
+      target_delimiter: ' '
+    num_fewshot: 0
+    metric_list:
+    - metric: acc
+      aggregation: mean
+      higher_is_better: true
+    output_type: multiple_choice
+    repeats: 1
+    should_decontaminate: true
+    doc_to_decontamination_query: sentence
+    metadata:
+      version: 1.0
+      pretrained: ./qwen3_iha_uptrain/phase2
+      dtype: bfloat16
+      trust_remote_code: true
+      device: cuda
+versions:
+  arc_challenge: 1.0
+  arc_easy: 1.0
+  boolq: 2.0
+  hellaswag: 1.0
+  sciq: 1.0
+  winogrande: 1.0
+n-shot:
+  arc_challenge: 0
+  arc_easy: 0
+  boolq: 0
+  hellaswag: 0
+  sciq: 0
+  winogrande: 0
+higher_is_better:
+  arc_challenge:
+    acc: true
+    acc_norm: true
+  arc_easy:
+    acc: true
+    acc_norm: true
+  boolq:
+    acc: true
+  hellaswag:
+    acc: true
+    acc_norm: true
+  sciq:
+    acc: true
+    acc_norm: true
+  winogrande:
+    acc: true
+n-samples:
+  boolq:
+    original: 3270
+    effective: 3270
+  winogrande:
+    original: 1267
+    effective: 1267
+  sciq:
+    original: 1000
+    effective: 1000
+  arc_challenge:
+    original: 1172
+    effective: 1172
+  arc_easy:
+    original: 2376
+    effective: 2376
+  hellaswag:
+    original: 10042
+    effective: 10042
+config:
+  model: hf
+  model_args: pretrained=./qwen3_iha_uptrain/phase2,dtype=bfloat16,trust_remote_code=true,device=cuda
+  model_num_parameters: 1516102656
+  model_dtype: torch.bfloat16
+  model_revision: main
+  model_sha: ''
+  batch_size: auto
+  batch_sizes:
+  - 64
+  device: null
+  use_cache: null
+  limit: null
+  bootstrap_iters: 100000
+  gen_kwargs: null
+  random_seed: 0
+  numpy_seed: 1234
+  torch_seed: 1234
+  fewshot_seed: 1234
+git_hash: 3fcf231
+date: 1773176035.1780071
+pretty_env_info: 'PyTorch version: 2.5.1+cu124
+
+  Is debug build: False
+
+  CUDA used to build PyTorch: 12.4
+
+  ROCM used to build PyTorch: N/A
+
+
+  OS: Ubuntu 24.04.4 LTS (x86_64)
+
+  GCC version: (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+
+  Clang version: Could not collect
+
+  CMake version: version 3.28.3
+
+  Libc version: glibc-2.39
+
+
+  Python version: 3.10.19 (main, Oct 21 2025, 16:43:05) [GCC 11.2.0] (64-bit runtime)
+
+  Python platform: Linux-6.17.0-1008-gcp-x86_64-with-glibc2.39
+
+  Is CUDA available: True
+
+  CUDA runtime version: Could not collect
+
+  CUDA_MODULE_LOADING set to: LAZY
+
+  GPU models and configuration: GPU 0: NVIDIA H100 80GB HBM3
+
+  Nvidia driver version: 580.126.09
+
+  cuDNN version: Could not collect
+
+  HIP runtime version: N/A
+
+  MIOpen runtime version: N/A
+
+  Is XNNPACK available: True
+
+
+  CPU:
+
+  Architecture:                            x86_64
+
+  CPU op-mode(s):                          32-bit, 64-bit
+
+  Address sizes:                           52 bits physical, 57 bits virtual
+
+  Byte Order:                              Little Endian
+
+  CPU(s):                                  26
+
+  On-line CPU(s) list:                     0-25
+
+  Vendor ID:                               GenuineIntel
+
+  Model name:                              Intel(R) Xeon(R) Platinum 8481C CPU @ 2.70GHz
+
+  CPU family:                              6
+
+  Model:                                   143
+
+  Thread(s) per core:                      2
+
+  Core(s) per socket:                      13
+
+  Socket(s):                               1
+
+  Stepping:                                8
+
+  BogoMIPS:                                5399.99
+
+  Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic
+  sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb
+  rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid tsc_known_freq
+  pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx
+  f16c rdrand hypervisor lahf_lm abm 3dnowprefetch ssbd ibrs ibpb stibp ibrs_enhanced
+  fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid rtm avx512f avx512dq rdseed
+  adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec
+  xgetbv1 xsaves avx_vnni avx512_bf16 arat avx512vbmi umip avx512_vbmi2 gfni vaes
+  vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq la57 rdpid cldemote movdiri
+  movdir64b fsrm md_clear serialize tsxldtrk amx_bf16 avx512_fp16 amx_tile amx_int8
+  arch_capabilities
+
+  Hypervisor vendor:                       KVM
+
+  Virtualization type:                     full
+
+  L1d cache:                               624 KiB (13 instances)
+
+  L1i cache:                               416 KiB (13 instances)
+
+  L2 cache:                                26 MiB (13 instances)
+
+  L3 cache:                                105 MiB (1 instance)
+
+  NUMA node(s):                            1
+
+  NUMA node0 CPU(s):                       0-25
+
+  Vulnerability Gather data sampling:      Not affected
+
+  Vulnerability Ghostwrite:                Not affected
+
+  Vulnerability Indirect target selection: Not affected
+
+  Vulnerability Itlb multihit:             Not affected
+
+  Vulnerability L1tf:                      Not affected
+
+  Vulnerability Mds:                       Not affected
+
+  Vulnerability Meltdown:                  Not affected
+
+  Vulnerability Mmio stale data:           Not affected
+
+  Vulnerability Old microcode:             Not affected
+
+  Vulnerability Reg file data sampling:    Not affected
+
+  Vulnerability Retbleed:                  Not affected
+
+  Vulnerability Spec rstack overflow:      Not affected
+
+  Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled
+  via prctl
+
+  Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and
+  __user pointer sanitization
+
+  Vulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS;
+  IBPB conditional; PBRSB-eIBRS SW sequence; BHI BHI_DIS_S
+
+  Vulnerability Srbds:                     Not affected
+
+  Vulnerability Tsa:                       Not affected
+
+  Vulnerability Tsx async abort:           Not affected
+
+  Vulnerability Vmscape:                   Not affected
+
+
+  Versions of relevant libraries:
+
+  [pip3] numpy==2.2.6
+
+  [pip3] torch==2.5.1
+
+  [pip3] torchaudio==2.5.1
+
+  [pip3] torchvision==0.20.1
+
+  [pip3] triton==3.1.0
+
+  [conda] numpy                       2.2.6                   pypi_0           pypi
+
+  [conda] torch                       2.5.1                   pypi_0           pypi
+
+  [conda] torchaudio                  2.5.1                   pypi_0           pypi
+
+  [conda] torchvision                 0.20.1                  pypi_0           pypi
+
+  [conda] triton                      3.1.0                   pypi_0           pypi'
+transformers_version: 5.3.0
+lm_eval_version: 0.4.11
+upper_git_hash: 3fcf231154e3cc6c8abab76aa207c68faeb16199
+tokenizer_pad_token:
+- <|endoftext|>
+- '151643'
+tokenizer_eos_token:
+- <|im_end|>
+- '151645'
+tokenizer_bos_token:
+- null
+- None
+eot_token_id: 151645
+max_length: 40960

@@ -25,7 +25,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--block_size", type=int, default=1024)
     parser.add_argument("--device", type=str, default="cuda", help="auto|cuda|cpu")
     parser.add_argument("--ppl_dtype", type=str, default="bfloat16", choices=["bfloat16", "float16", "float32"])
-    parser.add_argument("--ppl_max_samples", type=int, default=256, help="Max raw text examples for PPL eval subset")
+    parser.add_argument("--ppl_max_samples", type=int, default=1024, help="Max raw text examples for PPL eval subset")
     parser.add_argument("--ppl_batch_size", type=int, default=16)
     parser.add_argument("--trust_remote_code", action=argparse.BooleanOptionalAction, default=True)
     return parser.parse_args()

@@ -42,7 +42,7 @@ def parse_args() -> argparse.Namespace:
 	parser.add_argument("--split", type=str, default="validation", choices=["train", "validation", "test"])
 	parser.add_argument("--max_examples", type=int, default=None, help="Optional cap on number of examples")
 	parser.add_argument("--seed", type=int, default=1337, help="Random seed for shuffling")
-	parser.add_argument("--block_size", type=int, default=None, help="Override model block size")
+	parser.add_argument("--block_size", type=int, default=2048, help="Override model block size")
 	parser.add_argument("--length_norm", action=argparse.BooleanOptionalAction, default=True)
 	parser.add_argument("--output_json", type=str, default=None, help="Optional path to write metrics JSON")
 	parser.add_argument("--trust_remote_code", action=argparse.BooleanOptionalAction, default=True)

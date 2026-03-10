@@ -6,7 +6,7 @@ cd "$ROOT_DIR"
 
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 DEFAULT_BENCHMARKS=(
-	# hellaswag
+	hellaswag
 	arc-easy
 	arc-challenge
 	sciq
