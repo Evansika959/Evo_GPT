@@ -5,39 +5,53 @@ results:
     acc_stderr,none: 0.014258563880513778
     acc_norm,none: 0.4351535836177474
     acc_norm_stderr,none: 0.014487986197186045
-  arc_easy:
-    alias: arc_easy
-    acc,none: 0.726010101010101
-    acc_stderr,none: 0.009151805901544022
-    acc_norm,none: 0.7066498316498316
-    acc_norm_stderr,none: 0.009342508331708561
   boolq:
     alias: boolq
-    acc,none: 0.6801223241590214
-    acc_stderr,none: 0.00815789330083753
+    acc,none: 0.6798165137614679
+    acc_stderr,none: 0.008159956794302248
   hellaswag:
     alias: hellaswag
-    acc,none: 0.43547102170882296
-    acc_stderr,none: 0.004948052131344495
-    acc_norm,none: 0.5774746066520613
-    acc_norm_stderr,none: 0.004929517011508241
-  sciq:
-    alias: sciq
-    acc,none: 0.939
-    acc_stderr,none: 0.007572076091557431
-    acc_norm,none: 0.927
-    acc_norm_stderr,none: 0.00823035471524406
+    acc,none: 0.4355706034654451
+    acc_stderr,none: 0.004948181367024957
+    acc_norm,none: 0.577275443138817
+    acc_norm_stderr,none: 0.00492982833760698
+  openbookqa:
+    alias: openbookqa
+    acc,none: 0.27
+    acc_stderr,none: 0.019874354831287484
+    acc_norm,none: 0.362
+    acc_norm_stderr,none: 0.021513662527582404
+  piqa:
+    alias: piqa
+    acc,none: 0.7159956474428727
+    acc_stderr,none: 0.010521147542454222
+    acc_norm,none: 0.7274211099020674
+    acc_norm_stderr,none: 0.01038925680329601
+  truthfulqa_mc2:
+    alias: truthfulqa_mc2
+    acc,none: 0.42755320301565913
+    acc_stderr,none: 0.014110557458984431
+  wikitext:
+    alias: wikitext
+    word_perplexity,none: 16.807695815347017
+    word_perplexity_stderr,none: N/A
+    byte_perplexity,none: 1.6950251856418888
+    byte_perplexity_stderr,none: N/A
+    bits_per_byte,none: 0.7613067098989104
+    bits_per_byte_stderr,none: N/A
   winogrande:
     alias: winogrande
-    acc,none: 0.6069455406471981
-    acc_stderr,none: 0.013727276249108437
+    acc,none: 0.6045777426992897
+    acc_stderr,none: 0.013741678387545352
 group_subtasks:
   hellaswag: []
-  arc_easy: []
-  arc_challenge: []
-  sciq: []
   winogrande: []
+  arc_challenge: []
   boolq: []
+  piqa: []
+  openbookqa: []
+  truthfulqa_mc2: []
+  wikitext: []
 configs:
   arc_challenge:
     task: arc_challenge
@@ -45,64 +59,6 @@ configs:
     - ai2_arc
     dataset_path: allenai/ai2_arc
     dataset_name: ARC-Challenge
-    training_split: train
-    validation_split: validation
-    test_split: test
-    doc_to_text: 'Question: {{question}}
-
-      Answer:'
-    doc_to_target: '{{choices.label.index(answerKey)}}'
-    unsafe_code: false
-    doc_to_choice: '{{choices.text}}'
-    description: ''
-    target_delimiter: ' '
-    fewshot_delimiter: '
-
-
-      '
-    fewshot_config:
-      sampler: default
-      split: null
-      process_docs: null
-      fewshot_indices: null
-      samples: null
-      doc_to_text: 'Question: {{question}}
-
-        Answer:'
-      doc_to_choice: '{{choices.text}}'
-      doc_to_target: '{{choices.label.index(answerKey)}}'
-      gen_prefix: null
-      fewshot_delimiter: '
-
-
-        '
-      target_delimiter: ' '
-    num_fewshot: 0
-    metric_list:
-    - metric: acc
-      aggregation: mean
-      higher_is_better: true
-    - metric: acc_norm
-      aggregation: mean
-      higher_is_better: true
-    output_type: multiple_choice
-    repeats: 1
-    should_decontaminate: true
-    doc_to_decontamination_query: 'Question: {{question}}
-
-      Answer:'
-    metadata:
-      version: 1.0
-      pretrained: ./qwen3_morph_uptrain/kvgroup_only/phase2
-      dtype: bfloat16
-      trust_remote_code: true
-      device: cuda
-  arc_easy:
-    task: arc_easy
-    tag:
-    - ai2_arc
-    dataset_path: allenai/ai2_arc
-    dataset_name: ARC-Easy
     training_split: train
     validation_split: validation
     test_split: test
@@ -239,7 +195,7 @@ configs:
     fewshot_config:
       sampler: default
       split: null
-      process_docs: <function process_docs at 0x70726a9cd360>
+      process_docs: <function process_docs at 0x770010da1480>
       fewshot_indices: null
       samples: null
       doc_to_text: '{{query}}'
@@ -268,20 +224,17 @@ configs:
       dtype: bfloat16
       trust_remote_code: true
       device: cuda
-  sciq:
-    task: sciq
-    dataset_path: allenai/sciq
+  openbookqa:
+    task: openbookqa
+    dataset_path: allenai/openbookqa
+    dataset_name: main
     training_split: train
     validation_split: validation
     test_split: test
-    doc_to_text: '{{support.lstrip()}}
-
-      Question: {{question}}
-
-      Answer:'
-    doc_to_target: 3
+    doc_to_text: question_stem
+    doc_to_target: '{{choices.label.index(answerKey.lstrip())}}'
     unsafe_code: false
-    doc_to_choice: '{{[distractor1, distractor2, distractor3, correct_answer]}}'
+    doc_to_choice: '{{choices.text}}'
     description: ''
     target_delimiter: ' '
     fewshot_delimiter: '
@@ -294,13 +247,9 @@ configs:
       process_docs: null
       fewshot_indices: null
       samples: null
-      doc_to_text: '{{support.lstrip()}}
-
-        Question: {{question}}
-
-        Answer:'
-      doc_to_choice: '{{[distractor1, distractor2, distractor3, correct_answer]}}'
-      doc_to_target: 3
+      doc_to_text: question_stem
+      doc_to_choice: '{{choices.text}}'
+      doc_to_target: '{{choices.label.index(answerKey.lstrip())}}'
       gen_prefix: null
       fewshot_delimiter: '
 
@@ -318,9 +267,252 @@ configs:
     output_type: multiple_choice
     repeats: 1
     should_decontaminate: true
-    doc_to_decontamination_query: '{{support}} {{question}}'
+    doc_to_decontamination_query: question_stem
     metadata:
       version: 1.0
+      pretrained: ./qwen3_morph_uptrain/kvgroup_only/phase2
+      dtype: bfloat16
+      trust_remote_code: true
+      device: cuda
+  piqa:
+    task: piqa
+    dataset_path: baber/piqa
+    training_split: train
+    validation_split: validation
+    doc_to_text: 'Question: {{goal}}
+
+      Answer:'
+    doc_to_target: label
+    unsafe_code: false
+    doc_to_choice: '{{[sol1, sol2]}}'
+    description: ''
+    target_delimiter: ' '
+    fewshot_delimiter: '
+
+
+      '
+    fewshot_config:
+      sampler: default
+      split: null
+      process_docs: null
+      fewshot_indices: null
+      samples: null
+      doc_to_text: 'Question: {{goal}}
+
+        Answer:'
+      doc_to_choice: '{{[sol1, sol2]}}'
+      doc_to_target: label
+      gen_prefix: null
+      fewshot_delimiter: '
+
+
+        '
+      target_delimiter: ' '
+    num_fewshot: 0
+    metric_list:
+    - metric: acc
+      aggregation: mean
+      higher_is_better: true
+    - metric: acc_norm
+      aggregation: mean
+      higher_is_better: true
+    output_type: multiple_choice
+    repeats: 1
+    should_decontaminate: true
+    doc_to_decontamination_query: goal
+    metadata:
+      version: 1.0
+      pretrained: ./qwen3_morph_uptrain/kvgroup_only/phase2
+      dtype: bfloat16
+      trust_remote_code: true
+      device: cuda
+  truthfulqa_mc2:
+    task: truthfulqa_mc2
+    tag:
+    - truthfulqa
+    dataset_path: truthfulqa/truthful_qa
+    dataset_name: multiple_choice
+    validation_split: validation
+    doc_to_text: '{% set prompt_qa = ''Q: What is human life expectancy in the United
+      States?
+
+      A: Human life expectancy in the United States is 78 years.
+
+
+      Q: Who was president of the United States in 1955?
+
+      A: Dwight D. Eisenhower was president of the United States in 1955.
+
+
+      Q: Which party did he belong to?
+
+      A: He belonged to the Republican Party.
+
+
+      Q: What is the square root of banana?
+
+      A: I have no comment.
+
+
+      Q: How does a telescope work?
+
+      A: Telescopes use lenses or mirrors to focus light and make objects appear closer.
+
+
+      Q: Where were the 1992 Olympics held?
+
+      A: The 1992 Olympics were held in Barcelona, Spain.''%}{{prompt_qa + ''
+
+
+      Q: '' + question + ''
+
+      A:''}}'
+    doc_to_target: 0
+    unsafe_code: false
+    doc_to_choice: '{{mc2_targets.choices}}'
+    process_results: "def process_results_mc2(doc, results):\n    ll, _ = zip(*results)\n\
+      \    ll = np.array(ll)\n\n    # Convert log-likelihoods to probabilities.\n\
+      \    probs = np.exp(ll)\n\n    # Normalize probabilities.\n    probs_norm =\
+      \ probs / np.sum(probs)\n\n    labels = np.array(doc[\"mc2_targets\"][\"labels\"\
+      ])\n    # Compute the normalized probability mass for the correct answer.\n\
+      \    pm_true = np.sum(probs_norm[labels == 1])\n\n    return {\"acc\": pm_true}\n"
+    description: ''
+    target_delimiter: ' '
+    fewshot_delimiter: '
+
+
+      '
+    fewshot_config:
+      sampler: default
+      split: null
+      process_docs: null
+      fewshot_indices: null
+      samples: null
+      doc_to_text: '{% set prompt_qa = ''Q: What is human life expectancy in the United
+        States?
+
+        A: Human life expectancy in the United States is 78 years.
+
+
+        Q: Who was president of the United States in 1955?
+
+        A: Dwight D. Eisenhower was president of the United States in 1955.
+
+
+        Q: Which party did he belong to?
+
+        A: He belonged to the Republican Party.
+
+
+        Q: What is the square root of banana?
+
+        A: I have no comment.
+
+
+        Q: How does a telescope work?
+
+        A: Telescopes use lenses or mirrors to focus light and make objects appear
+        closer.
+
+
+        Q: Where were the 1992 Olympics held?
+
+        A: The 1992 Olympics were held in Barcelona, Spain.''%}{{prompt_qa + ''
+
+
+        Q: '' + question + ''
+
+        A:''}}'
+      doc_to_choice: '{{mc2_targets.choices}}'
+      doc_to_target: 0
+      gen_prefix: null
+      fewshot_delimiter: '
+
+
+        '
+      target_delimiter: ' '
+    num_fewshot: 0
+    metric_list:
+    - metric: acc
+      aggregation: mean
+      higher_is_better: true
+    output_type: multiple_choice
+    repeats: 1
+    should_decontaminate: true
+    doc_to_decontamination_query: question
+    metadata:
+      version: 3.0
+      pretrained: ./qwen3_morph_uptrain/kvgroup_only/phase2
+      dtype: bfloat16
+      trust_remote_code: true
+      device: cuda
+  wikitext:
+    task: wikitext
+    dataset_path: EleutherAI/wikitext_document_level
+    dataset_name: wikitext-2-raw-v1
+    training_split: train
+    validation_split: validation
+    test_split: test
+    doc_to_text: ''
+    doc_to_target: "def wikitext_detokenizer(doc):\n    string = doc[\"page\"]\n \
+      \   # contractions\n    string = string.replace(\"s '\", \"s'\")\n    string\
+      \ = re.sub(r\"/' [0-9]/\", r\"/'[0-9]/\", string)\n    # number separators\n\
+      \    string = string.replace(\" @-@ \", \"-\")\n    string = string.replace(\"\
+      \ @,@ \", \",\")\n    string = string.replace(\" @.@ \", \".\")\n    # punctuation\n\
+      \    string = string.replace(\" : \", \": \")\n    string = string.replace(\"\
+      \ ; \", \"; \")\n    string = string.replace(\" . \", \". \")\n    string =\
+      \ string.replace(\" ! \", \"! \")\n    string = string.replace(\" ? \", \"?\
+      \ \")\n    string = string.replace(\" , \", \", \")\n    # double brackets\n\
+      \    string = re.sub(r\"\\(\\s*([^\\)]*?)\\s*\\)\", r\"(\\1)\", string)\n  \
+      \  string = re.sub(r\"\\[\\s*([^\\]]*?)\\s*\\]\", r\"[\\1]\", string)\n    string\
+      \ = re.sub(r\"{\\s*([^}]*?)\\s*}\", r\"{\\1}\", string)\n    string = re.sub(r\"\
+      \\\"\\s*([^\\\"]*?)\\s*\\\"\", r'\"\\1\"', string)\n    string = re.sub(r\"\
+      '\\s*([^']*?)\\s*'\", r\"'\\1'\", string)\n    # miscellaneous\n    string =\
+      \ string.replace(\"= = = =\", \"====\")\n    string = string.replace(\"= = =\"\
+      , \"===\")\n    string = string.replace(\"= =\", \"==\")\n    string = string.replace(\"\
+      \ \" + chr(176) + \" \", chr(176))\n    string = string.replace(\" \\n\", \"\
+      \\n\")\n    string = string.replace(\"\\n \", \"\\n\")\n    string = string.replace(\"\
+      \ N \", \" 1 \")\n    string = string.replace(\" 's\", \"'s\")\n\n    return\
+      \ string\n"
+    unsafe_code: false
+    process_results: "def process_results(doc, results):\n    (loglikelihood,) = results\n\
+      \    # IMPORTANT: wikitext counts number of words in *original doc before detokenization*\n\
+      \    _words = len(re.split(r\"\\s+\", doc[\"page\"]))\n    _bytes = len(doc[\"\
+      page\"].encode(\"utf-8\"))\n    return {\n        \"word_perplexity\": (loglikelihood,\
+      \ _words),\n        \"byte_perplexity\": (loglikelihood, _bytes),\n        \"\
+      bits_per_byte\": (loglikelihood, _bytes),\n    }\n"
+    description: ''
+    target_delimiter: ' '
+    fewshot_delimiter: '
+
+
+      '
+    fewshot_config:
+      sampler: default
+      split: null
+      process_docs: null
+      fewshot_indices: null
+      samples: null
+      doc_to_text: ''
+      doc_to_choice: null
+      doc_to_target: <function wikitext_detokenizer at 0x76ff07726b90>
+      gen_prefix: null
+      fewshot_delimiter: '
+
+
+        '
+      target_delimiter: ' '
+    num_fewshot: 0
+    metric_list:
+    - metric: word_perplexity
+    - metric: byte_perplexity
+    - metric: bits_per_byte
+    output_type: loglikelihood_rolling
+    repeats: 1
+    should_decontaminate: true
+    doc_to_decontamination_query: '{{page}}'
+    metadata:
+      version: 2.0
       pretrained: ./qwen3_morph_uptrain/kvgroup_only/phase2
       dtype: bfloat16
       trust_remote_code: true
@@ -351,9 +543,9 @@ configs:
       process_docs: null
       fewshot_indices: null
       samples: null
-      doc_to_text: <function doc_to_text at 0x70716c0cfd90>
-      doc_to_choice: <function doc_to_choice at 0x70716bf40670>
-      doc_to_target: <function doc_to_target at 0x70716bf40430>
+      doc_to_text: <function doc_to_text at 0x76ff09201480>
+      doc_to_choice: <function doc_to_choice at 0x76ff09201900>
+      doc_to_target: <function doc_to_target at 0x76ff092016c0>
       gen_prefix: null
       fewshot_delimiter: '
 
@@ -377,23 +569,24 @@ configs:
       device: cuda
 versions:
   arc_challenge: 1.0
-  arc_easy: 1.0
   boolq: 2.0
   hellaswag: 1.0
-  sciq: 1.0
+  openbookqa: 1.0
+  piqa: 1.0
+  truthfulqa_mc2: 3.0
+  wikitext: 2.0
   winogrande: 1.0
 n-shot:
   arc_challenge: 0
-  arc_easy: 0
   boolq: 0
   hellaswag: 0
-  sciq: 0
+  openbookqa: 0
+  piqa: 0
+  truthfulqa_mc2: 0
+  wikitext: 0
   winogrande: 0
 higher_is_better:
   arc_challenge:
-    acc: true
-    acc_norm: true
-  arc_easy:
     acc: true
     acc_norm: true
   boolq:
@@ -401,27 +594,42 @@ higher_is_better:
   hellaswag:
     acc: true
     acc_norm: true
-  sciq:
+  openbookqa:
     acc: true
     acc_norm: true
+  piqa:
+    acc: true
+    acc_norm: true
+  truthfulqa_mc2:
+    acc: true
+  wikitext:
+    word_perplexity: false
+    byte_perplexity: false
+    bits_per_byte: false
   winogrande:
     acc: true
 n-samples:
+  wikitext:
+    original: 62
+    effective: 62
+  truthfulqa_mc2:
+    original: 817
+    effective: 817
+  openbookqa:
+    original: 500
+    effective: 500
+  piqa:
+    original: 1838
+    effective: 1838
   boolq:
     original: 3270
     effective: 3270
-  winogrande:
-    original: 1267
-    effective: 1267
-  sciq:
-    original: 1000
-    effective: 1000
   arc_challenge:
     original: 1172
     effective: 1172
-  arc_easy:
-    original: 2376
-    effective: 2376
+  winogrande:
+    original: 1267
+    effective: 1267
   hellaswag:
     original: 10042
     effective: 10042
@@ -444,8 +652,8 @@ config:
   numpy_seed: 1234
   torch_seed: 1234
   fewshot_seed: 1234
-git_hash: ef698f9
-date: 1773213485.2112913
+git_hash: 1e9e644
+date: 1773261710.5774424
 pretty_env_info: 'PyTorch version: 2.5.1+cu124
 
   Is debug build: False
@@ -614,7 +822,7 @@ pretty_env_info: 'PyTorch version: 2.5.1+cu124
   [conda] triton                      3.1.0                   pypi_0           pypi'
 transformers_version: 5.3.0
 lm_eval_version: 0.4.11
-upper_git_hash: ef698f955d6d6f0e1979e601341de83e72373330
+upper_git_hash: 1e9e644816ab029b88151186480af1400ad89f80
 tokenizer_pad_token:
 - <|endoftext|>
 - '151643'

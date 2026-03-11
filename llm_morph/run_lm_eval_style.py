@@ -45,6 +45,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--system_instruction", type=str, default=None)
     parser.add_argument("--fewshot_as_multiturn", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--verbosity", type=str, default="INFO", help="lm-eval verbosity")
+    parser.add_argument(
+        "--gen_kwargs",
+        type=str,
+        default=None,
+        help="Generation kwargs passed to lm-eval as comma-separated key=value "
+             "(e.g., max_gen_toks=512,do_sample=false)",
+    )
+    parser.add_argument(
+        "--attn_implementation",
+        type=str,
+        default=None,
+        help="HF attention implementation (flash_attention_2, sdpa, eager)",
+    )
     return parser.parse_args()
 
 
@@ -75,6 +88,8 @@ def _build_model_args(args: argparse.Namespace, resolved_device: str) -> str:
     ]
     if resolved_device != "auto":
         parts.append(f"device={resolved_device}")
+    if args.attn_implementation:
+        parts.append(f"attn_implementation={args.attn_implementation}")
     return ",".join(parts)
 
 
@@ -91,6 +106,23 @@ def _make_yaml_safe(value: Any) -> Any:
         return [_make_yaml_safe(v) for v in value]
     if isinstance(value, tuple):
         return [_make_yaml_safe(v) for v in value]
+    # Handle numpy / torch scalar types BEFORE the native-type check because
+    # np.float64 is a subclass of float (passes isinstance) but yaml.safe_dump
+    # rejects it by exact type.
+    try:
+        import numpy as np
+        if isinstance(value, np.integer):
+            return int(value)
+        if isinstance(value, np.floating):
+            return float(value)
+        if isinstance(value, np.bool_):
+            return bool(value)
+        if isinstance(value, np.ndarray):
+            return value.tolist()
+    except ImportError:
+        pass
+    if isinstance(value, torch.Tensor):
+        return value.item() if value.numel() == 1 else value.tolist()
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
     return str(value)
@@ -128,6 +160,8 @@ def main() -> None:
         "system_instruction": args.system_instruction,
         "fewshot_as_multiturn": args.fewshot_as_multiturn,
         "verbosity": args.verbosity,
+        "confirm_run_unsafe_code": True,
+        "gen_kwargs": args.gen_kwargs,
     }
 
     eval_kwargs = _filter_kwargs_for_signature(evaluator.simple_evaluate, eval_kwargs)
