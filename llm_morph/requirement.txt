@@ -1,0 +1,12 @@
+# Core dependencies
+transformers>=4.49.0
+torch
+datasets
+numpy
+tqdm
+PyYAML
+accelerate
+safetensors
+
+# Needed for run_lm_eval_style.py
+lm-eval

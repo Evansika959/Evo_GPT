@@ -8,7 +8,7 @@ EXP_NAME="kvgroup_only"
 
 MODEL_DIR="${MODEL_DIR:-./morphed_trial/${EXP_NAME}/}"
 OUTPUT_DIR="${OUTPUT_DIR:-./qwen3_morph_uptrain/${EXP_NAME}/}"
-DATASET_NAME="${DATASET_NAME:-Skylion007/openwebtext}"
+DATASET_NAME="${DATASET_NAME:-JeanKaddour/minipile}"
 DATASET_SPLIT="${DATASET_SPLIT:-train}"
 
 python3 uptrain.py \
