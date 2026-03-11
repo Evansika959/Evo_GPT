@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import inspect
+import itertools
 import json
 import math
 import os
@@ -69,6 +70,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--fp16", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--device", type=str, default="cuda", help="auto|cuda|cpu")
     parser.add_argument("--trust_remote_code", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument(
+        "--num_workers",
+        type=int,
+        default=None,
+        help="Number of processes for dataset.map(). Defaults to max(1, nproc-2).",
+    )
     parser.add_argument(
         "--log_file",
         type=str,
@@ -143,15 +150,29 @@ def _get_dataset(args: argparse.Namespace):
     raise ValueError("Provide --dataset_name or --data_path")
 
 
-def _tokenize_and_group(dataset, tokenizer, block_size: int, text_column: str):
+def _tokenize_and_group(dataset, tokenizer, block_size: int, text_column: str, num_proc: int | None = None):
+
+    if num_proc is None:
+        import multiprocessing
+        num_proc = max(1, multiprocessing.cpu_count() - 2)
+    print(f"[uptrain] dataset.map num_proc={num_proc}")
 
     def tokenize_fn(batch):
         return tokenizer(batch[text_column])
 
-    tokenized = dataset.map(tokenize_fn, batched=True, remove_columns=[text_column])
+    tokenized = dataset.map(
+        tokenize_fn,
+        batched=True,
+        remove_columns=[text_column],
+        num_proc=num_proc,
+        desc="Tokenizing",
+    )
 
     def group_texts(batch):
-        concatenated = {k: sum(batch[k], []) for k in batch.keys()}
+        # Use itertools.chain instead of sum(list, []) to avoid O(n²) concat
+        concatenated = {
+            k: list(itertools.chain.from_iterable(batch[k])) for k in batch.keys()
+        }
         total_len = (len(concatenated["input_ids"]) // block_size) * block_size
         result = {
             k: [vals[i : i + block_size] for i in range(0, total_len, block_size)]
@@ -160,7 +181,12 @@ def _tokenize_and_group(dataset, tokenizer, block_size: int, text_column: str):
         result["labels"] = [x.copy() for x in result["input_ids"]]
         return result
 
-    return tokenized.map(group_texts, batched=True)
+    return tokenized.map(
+        group_texts,
+        batched=True,
+        num_proc=num_proc,
+        desc="Grouping into blocks",
+    )
 
 
 def _freeze_all(model):
@@ -409,7 +435,7 @@ def main() -> None:
         model = model.to(device)
 
         dataset = _get_dataset(args)
-        train_dataset = _tokenize_and_group(dataset, tokenizer, args.block_size, args.text_column)
+        train_dataset = _tokenize_and_group(dataset, tokenizer, args.block_size, args.text_column, num_proc=args.num_workers)
 
         _set_phase1_requires_grad(model, model.config)
         _run_phase(

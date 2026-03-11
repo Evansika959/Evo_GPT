@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT_DIR"
 
-EXP_NAME="kvgroup_only"
+EXP_NAME="front_mlp"
 # DATASET_NAME="JeanKaddour/minipile"
 DATASET_NAME="Skylion007/openwebtext"
 

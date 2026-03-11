@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT_DIR"
 
-EXP_NAME="kvgroup_only"
+EXP_NAME="front_mlp"
 
 MODEL_ID="${MODEL_ID:-Qwen/Qwen3-1.7B}"
 OUT_DIR="${OUT_DIR:-./morphed_trial/${EXP_NAME}/}"

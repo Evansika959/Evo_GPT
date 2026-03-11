@@ -53,8 +53,11 @@ DEVICE="${DEVICE:-cuda}"
 DTYPE="${DTYPE:-bfloat16}"
 NUM_FEWSHOT="${NUM_FEWSHOT:-0}"
 BATCH_SIZE="${BATCH_SIZE:-auto}"
+EXP_NAME="${EXP_NAME:-kvgroup_only}"
 
+UPTRAIN_OUTPUT_DIR="${UPTRAIN_OUTPUT_DIR:-./qwen3_morph_uptrain/${EXP_NAME}}"
 UPTRAIN_OUTPUT_DIR="${UPTRAIN_OUTPUT_DIR:-./qwen3_iha_uptrain}"
+
 
 if [[ -d "$UPTRAIN_OUTPUT_DIR/phase2" && -f "$UPTRAIN_OUTPUT_DIR/phase2/config.json" ]]; then
 	UPTRAINED_MODEL_DIR="$UPTRAIN_OUTPUT_DIR/phase2"
@@ -67,6 +70,7 @@ fi
 
 RESULTS_DIR="${RESULTS_DIR:-./report/benchmark_eval}"
 mkdir -p "$RESULTS_DIR"
+OUTPUT_YAML="${OUTPUT_YAML:-$RESULTS_DIR/${EXP_NAME}_uptrained_lm_eval_metrics.yaml}"
 
 LIMIT="${LIMIT:-}"
 if [[ -z "$LIMIT" && -n "${MAX_EXAMPLES:-}" ]]; then
@@ -80,7 +84,7 @@ COMMON_ARGS=(
 	--num_fewshot "$NUM_FEWSHOT"
 	--batch_size "$BATCH_SIZE"
 	--trust_remote_code
-	--output_yaml "$RESULTS_DIR/uptrained_lm_eval_metrics.yaml"
+	--output_yaml "$OUTPUT_YAML"
 )
 
 if [[ -n "$LIMIT" ]]; then
@@ -88,11 +92,12 @@ if [[ -n "$LIMIT" ]]; then
 fi
 
 echo "Running LM-eval benchmark for uptrained model: $UPTRAINED_MODEL_DIR"
+echo "Experiment name: $EXP_NAME"
 echo "Resolved tasks: $TASKS"
 
 "$PYTHON_BIN" run_lm_eval_style.py \
 	--model_dir "$UPTRAINED_MODEL_DIR" \
 	"${COMMON_ARGS[@]}"
 
-echo "Done. Results written to: $RESULTS_DIR/uptrained_lm_eval_metrics.yaml"
+echo "Done. Results written to: $OUTPUT_YAML"
 
