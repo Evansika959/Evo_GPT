@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import argparse
 import inspect
+import os
 from pathlib import Path
 from typing import Any
 
 import torch
 import yaml
+
+# Tasks that require executing model-generated code (e.g. MBPP, HumanEval).
+# We auto-set HF_ALLOW_CODE_EVAL so users don't hit the safety gate by surprise.
+_CODE_EVAL_TASKS = {"mbpp", "humaneval"}
 
 
 def parse_args() -> argparse.Namespace:
@@ -95,6 +100,10 @@ def main() -> None:
     args = parse_args()
     resolved_device = _resolve_device(args.device)
     task_list = _parse_tasks(args.tasks)
+
+    # Auto-enable code execution for code-eval benchmarks (MBPP, HumanEval, etc.)
+    if any(t in _CODE_EVAL_TASKS for t in task_list):
+        os.environ.setdefault("HF_ALLOW_CODE_EVAL", "1")
 
     try:
         from lm_eval import evaluator

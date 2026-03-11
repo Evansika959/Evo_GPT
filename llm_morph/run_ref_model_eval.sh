@@ -11,11 +11,15 @@ PYTHON_BIN="${PYTHON_BIN:-$DEFAULT_PYTHON}"
 MODEL_ID="${MODEL_ID:-Qwen/Qwen3-1.7B}"
 DEFAULT_TASKS=(
 	hellaswag
-	arc_easy
-	arc_challenge
-	sciq
 	winogrande
+	arc_challenge
 	boolq
+	piqa
+	mmlu
+	gsm8k
+	mbpp
+	truthfulqa_mc2
+	wikitext
 )
 
 if [[ -n "${TASKS:-}" ]]; then

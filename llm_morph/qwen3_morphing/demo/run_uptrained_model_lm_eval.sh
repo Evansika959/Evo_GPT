@@ -8,11 +8,15 @@ PYTHON_BIN="${PYTHON_BIN:-python3}"
 
 DEFAULT_BENCHMARKS=(
 	hellaswag
-	arc-easy
-	arc-challenge
-	sciq
 	winogrande
+	arc-challenge
 	boolq
+	piqa
+	mmlu
+	gsm8k
+	mbpp
+	truthfulqa-mc2
+	wikitext
 )
 
 if [[ -n "${BENCHMARKS:-}" ]]; then
@@ -26,7 +30,8 @@ map_task_name() {
 	case "$task" in
 		arc-easy) echo "arc_easy" ;;
 		arc-challenge) echo "arc_challenge" ;;
-		hellaswag|sciq|winogrande|boolq) echo "$task" ;;
+		truthfulqa-mc2) echo "truthfulqa_mc2" ;;
+		hellaswag|winogrande|boolq|piqa|mmlu|gsm8k|mbpp|wikitext) echo "$task" ;;
 		*) echo "$task" ;;
 	esac
 }
