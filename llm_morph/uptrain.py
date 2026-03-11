@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import inspect
+import json
 import math
 import os
+import shlex
+import sys
 from typing import Iterable, Dict
 
 import torch
@@ -13,6 +17,25 @@ from datasets import load_dataset
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer
+
+
+class _TeeStream:
+    def __init__(self, *streams):
+        self.streams = streams
+
+    def write(self, data):
+        for stream in self.streams:
+            stream.write(data)
+        return len(data)
+
+    def flush(self):
+        for stream in self.streams:
+            stream.flush()
+
+    def isatty(self):
+        if not self.streams:
+            return False
+        return bool(getattr(self.streams[0], "isatty", lambda: False)())
 
 
 def parse_args() -> argparse.Namespace:
@@ -46,7 +69,57 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--fp16", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--device", type=str, default="cuda", help="auto|cuda|cpu")
     parser.add_argument("--trust_remote_code", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument(
+        "--log_file",
+        type=str,
+        default=None,
+        help="Optional path to execution log file. If unset, writes to <output_dir>/uptrain_<timestamp>.log",
+    )
     return parser.parse_args()
+
+
+def _setup_execution_logging(args: argparse.Namespace):
+    if args.log_file:
+        log_file = args.log_file
+    else:
+        timestamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_file = os.path.join(args.output_dir, f"uptrain_{timestamp}.log")
+
+    log_dir = os.path.dirname(log_file)
+    if log_dir:
+        os.makedirs(log_dir, exist_ok=True)
+
+    log_handle = open(log_file, "a", encoding="utf-8")
+    original_stdout, original_stderr = sys.stdout, sys.stderr
+    sys.stdout = _TeeStream(original_stdout, log_handle)
+    sys.stderr = _TeeStream(original_stderr, log_handle)
+
+    started_at = dt.datetime.now()
+    print(f"[uptrain] log_file: {os.path.abspath(log_file)}")
+    print(f"[uptrain] start_time: {started_at.isoformat(timespec='seconds')}")
+    print(f"[uptrain] argv: {' '.join(shlex.quote(a) for a in sys.argv)}")
+    print(f"[uptrain] args: {json.dumps(vars(args), sort_keys=True)}")
+
+    return log_handle, original_stdout, original_stderr, started_at, log_file
+
+
+def _finalize_execution_logging(
+    log_handle,
+    original_stdout,
+    original_stderr,
+    started_at: dt.datetime,
+    status: str,
+) -> None:
+    ended_at = dt.datetime.now()
+    elapsed = ended_at - started_at
+    print(f"[uptrain] end_time: {ended_at.isoformat(timespec='seconds')}")
+    print(f"[uptrain] elapsed: {str(elapsed).split('.')[0]}")
+    print(f"[uptrain] status: {status}")
+    sys.stdout.flush()
+    sys.stderr.flush()
+    sys.stdout = original_stdout
+    sys.stderr = original_stderr
+    log_handle.close()
 
 
 def _get_dataset(args: argparse.Namespace):
@@ -320,43 +393,52 @@ def _run_phase(
 
 def main() -> None:
     args = parse_args()
-    device = _resolve_device(args.device)
+    log_handle, original_stdout, original_stderr, started_at, _ = _setup_execution_logging(args)
+    status = "success"
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_dir, trust_remote_code=args.trust_remote_code)
-    model = AutoModelForCausalLM.from_pretrained(
-        args.model_dir,
-        trust_remote_code=args.trust_remote_code,
-        low_cpu_mem_usage=False,
-    )
-    _materialize_known_meta_params(model)
-    model = model.to(device)
+    try:
+        device = _resolve_device(args.device)
 
-    dataset = _get_dataset(args)
-    train_dataset = _tokenize_and_group(dataset, tokenizer, args.block_size, args.text_column)
+        tokenizer = AutoTokenizer.from_pretrained(args.model_dir, trust_remote_code=args.trust_remote_code)
+        model = AutoModelForCausalLM.from_pretrained(
+            args.model_dir,
+            trust_remote_code=args.trust_remote_code,
+            low_cpu_mem_usage=False,
+        )
+        _materialize_known_meta_params(model)
+        model = model.to(device)
 
-    _set_phase1_requires_grad(model, model.config)
-    _run_phase(
-        model,
-        tokenizer,
-        train_dataset,
-        args.output_dir + "/phase1",
-        args,
-        args.learning_rate_phase1,
-        args.max_steps_phase1,
-        "Phase 1",
-    )
+        dataset = _get_dataset(args)
+        train_dataset = _tokenize_and_group(dataset, tokenizer, args.block_size, args.text_column)
 
-    _set_phase2_requires_grad(model)
-    _run_phase(
-        model,
-        tokenizer,
-        train_dataset,
-        args.output_dir + "/phase2",
-        args,
-        args.learning_rate_phase2,
-        args.max_steps_phase2,
-        "Phase 2",
-    )
+        _set_phase1_requires_grad(model, model.config)
+        _run_phase(
+            model,
+            tokenizer,
+            train_dataset,
+            args.output_dir + "/phase1",
+            args,
+            args.learning_rate_phase1,
+            args.max_steps_phase1,
+            "Phase 1",
+        )
+
+        _set_phase2_requires_grad(model)
+        _run_phase(
+            model,
+            tokenizer,
+            train_dataset,
+            args.output_dir + "/phase2",
+            args,
+            args.learning_rate_phase2,
+            args.max_steps_phase2,
+            "Phase 2",
+        )
+    except Exception:
+        status = "failed"
+        raise
+    finally:
+        _finalize_execution_logging(log_handle, original_stdout, original_stderr, started_at, status)
 
 if __name__ == "__main__":
     main()
