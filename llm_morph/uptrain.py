@@ -356,7 +356,7 @@ def _run_phase(
             bf16=args.bf16,
             fp16=args.fp16,
             logging_steps=10,
-            save_steps=50000,
+            save_steps=40000,
             save_total_limit=2,
             report_to=[],
             disable_tqdm=False,
