@@ -1,153 +1,23 @@
 results:
-  arc_challenge:
-    alias: arc_challenge
-    acc,none: 0.3993174061433447
-    acc_stderr,none: 0.014312094557946704
-    acc_norm,none: 0.4300341296928328
-    acc_norm_stderr,none: 0.014467631559137986
-  arc_easy:
-    alias: arc_easy
-    acc,none: 0.7243265993265994
-    acc_stderr,none: 0.009169229476542572
-    acc_norm,none: 0.7024410774410774
-    acc_norm_stderr,none: 0.009381226721815548
   boolq:
     alias: boolq
     acc,none: 0.7764525993883792
     acc_stderr,none: 0.00728676604564177
-  sciq:
-    alias: sciq
-    acc,none: 0.932
-    acc_stderr,none: 0.007964887911291605
-    acc_norm,none: 0.912
-    acc_norm_stderr,none: 0.008963053962592057
+  hellaswag:
+    alias: hellaswag
+    acc,none: 0.4615614419438359
+    acc_stderr,none: 0.004975014529648622
+    acc_norm,none: 0.6040629356701852
+    acc_norm_stderr,none: 0.004880515431323174
   winogrande:
     alias: winogrande
-    acc,none: 0.6156274664561957
-    acc_stderr,none: 0.01367156760083619
+    acc,none: 0.6140489344909235
+    acc_stderr,none: 0.013682036993397413
 group_subtasks:
-  arc_easy: []
-  arc_challenge: []
-  sciq: []
+  hellaswag: []
   winogrande: []
   boolq: []
 configs:
-  arc_challenge:
-    task: arc_challenge
-    tag:
-    - ai2_arc
-    dataset_path: allenai/ai2_arc
-    dataset_name: ARC-Challenge
-    training_split: train
-    validation_split: validation
-    test_split: test
-    doc_to_text: 'Question: {{question}}
-
-      Answer:'
-    doc_to_target: '{{choices.label.index(answerKey)}}'
-    unsafe_code: false
-    doc_to_choice: '{{choices.text}}'
-    description: ''
-    target_delimiter: ' '
-    fewshot_delimiter: '
-
-
-      '
-    fewshot_config:
-      sampler: default
-      split: null
-      process_docs: null
-      fewshot_indices: null
-      samples: null
-      doc_to_text: 'Question: {{question}}
-
-        Answer:'
-      doc_to_choice: '{{choices.text}}'
-      doc_to_target: '{{choices.label.index(answerKey)}}'
-      gen_prefix: null
-      fewshot_delimiter: '
-
-
-        '
-      target_delimiter: ' '
-    num_fewshot: 0
-    metric_list:
-    - metric: acc
-      aggregation: mean
-      higher_is_better: true
-    - metric: acc_norm
-      aggregation: mean
-      higher_is_better: true
-    output_type: multiple_choice
-    repeats: 1
-    should_decontaminate: true
-    doc_to_decontamination_query: 'Question: {{question}}
-
-      Answer:'
-    metadata:
-      version: 1.0
-      pretrained: Qwen/Qwen3-1.7B
-      dtype: bfloat16
-      trust_remote_code: true
-      device: cuda
-  arc_easy:
-    task: arc_easy
-    tag:
-    - ai2_arc
-    dataset_path: allenai/ai2_arc
-    dataset_name: ARC-Easy
-    training_split: train
-    validation_split: validation
-    test_split: test
-    doc_to_text: 'Question: {{question}}
-
-      Answer:'
-    doc_to_target: '{{choices.label.index(answerKey)}}'
-    unsafe_code: false
-    doc_to_choice: '{{choices.text}}'
-    description: ''
-    target_delimiter: ' '
-    fewshot_delimiter: '
-
-
-      '
-    fewshot_config:
-      sampler: default
-      split: null
-      process_docs: null
-      fewshot_indices: null
-      samples: null
-      doc_to_text: 'Question: {{question}}
-
-        Answer:'
-      doc_to_choice: '{{choices.text}}'
-      doc_to_target: '{{choices.label.index(answerKey)}}'
-      gen_prefix: null
-      fewshot_delimiter: '
-
-
-        '
-      target_delimiter: ' '
-    num_fewshot: 0
-    metric_list:
-    - metric: acc
-      aggregation: mean
-      higher_is_better: true
-    - metric: acc_norm
-      aggregation: mean
-      higher_is_better: true
-    output_type: multiple_choice
-    repeats: 1
-    should_decontaminate: true
-    doc_to_decontamination_query: 'Question: {{question}}
-
-      Answer:'
-    metadata:
-      version: 1.0
-      pretrained: Qwen/Qwen3-1.7B
-      dtype: bfloat16
-      trust_remote_code: true
-      device: cuda
   boolq:
     task: boolq
     tag:
@@ -206,20 +76,23 @@ configs:
       dtype: bfloat16
       trust_remote_code: true
       device: cuda
-  sciq:
-    task: sciq
-    dataset_path: allenai/sciq
+  hellaswag:
+    task: hellaswag
+    tag:
+    - multiple_choice
+    dataset_path: Rowan/hellaswag
     training_split: train
     validation_split: validation
-    test_split: test
-    doc_to_text: '{{support.lstrip()}}
-
-      Question: {{question}}
-
-      Answer:'
-    doc_to_target: 3
+    process_docs: "def process_docs(dataset: datasets.Dataset) -> datasets.Dataset:\n\
+      \    def _process_doc(doc):\n        ctx = doc[\"ctx_a\"] + \" \" + doc[\"ctx_b\"\
+      ].capitalize()\n        out_doc = {\n            \"query\": preprocess(doc[\"\
+      activity_label\"] + \": \" + ctx),\n            \"choices\": [preprocess(ending)\
+      \ for ending in doc[\"endings\"]],\n            \"gold\": int(doc[\"label\"\
+      ]),\n        }\n        return out_doc\n\n    return dataset.map(_process_doc)\n"
+    doc_to_text: '{{query}}'
+    doc_to_target: '{{label}}'
     unsafe_code: false
-    doc_to_choice: '{{[distractor1, distractor2, distractor3, correct_answer]}}'
+    doc_to_choice: choices
     description: ''
     target_delimiter: ' '
     fewshot_delimiter: '
@@ -229,16 +102,12 @@ configs:
     fewshot_config:
       sampler: default
       split: null
-      process_docs: null
+      process_docs: <function process_docs at 0x753975c149d0>
       fewshot_indices: null
       samples: null
-      doc_to_text: '{{support.lstrip()}}
-
-        Question: {{question}}
-
-        Answer:'
-      doc_to_choice: '{{[distractor1, distractor2, distractor3, correct_answer]}}'
-      doc_to_target: 3
+      doc_to_text: '{{query}}'
+      doc_to_choice: choices
+      doc_to_target: '{{label}}'
       gen_prefix: null
       fewshot_delimiter: '
 
@@ -255,8 +124,7 @@ configs:
       higher_is_better: true
     output_type: multiple_choice
     repeats: 1
-    should_decontaminate: true
-    doc_to_decontamination_query: '{{support}} {{question}}'
+    should_decontaminate: false
     metadata:
       version: 1.0
       pretrained: Qwen/Qwen3-1.7B
@@ -289,9 +157,9 @@ configs:
       process_docs: null
       fewshot_indices: null
       samples: null
-      doc_to_text: <function doc_to_text at 0x7d83d80a2560>
-      doc_to_choice: <function doc_to_choice at 0x7d83d80a2d40>
-      doc_to_target: <function doc_to_target at 0x7d83d80a2b00>
+      doc_to_text: <function doc_to_text at 0x75394a42c8b0>
+      doc_to_choice: <function doc_to_choice at 0x75394a42cd30>
+      doc_to_target: <function doc_to_target at 0x75394a42caf0>
       gen_prefix: null
       fewshot_delimiter: '
 
@@ -314,27 +182,17 @@ configs:
       trust_remote_code: true
       device: cuda
 versions:
-  arc_challenge: 1.0
-  arc_easy: 1.0
   boolq: 2.0
-  sciq: 1.0
+  hellaswag: 1.0
   winogrande: 1.0
 n-shot:
-  arc_challenge: 0
-  arc_easy: 0
   boolq: 0
-  sciq: 0
+  hellaswag: 0
   winogrande: 0
 higher_is_better:
-  arc_challenge:
-    acc: true
-    acc_norm: true
-  arc_easy:
-    acc: true
-    acc_norm: true
   boolq:
     acc: true
-  sciq:
+  hellaswag:
     acc: true
     acc_norm: true
   winogrande:
@@ -346,15 +204,9 @@ n-samples:
   winogrande:
     original: 1267
     effective: 1267
-  sciq:
-    original: 1000
-    effective: 1000
-  arc_challenge:
-    original: 1172
-    effective: 1172
-  arc_easy:
-    original: 2376
-    effective: 2376
+  hellaswag:
+    original: 10042
+    effective: 10042
 config:
   model: hf
   model_args: pretrained=Qwen/Qwen3-1.7B,dtype=bfloat16,trust_remote_code=true,device=cuda
@@ -374,8 +226,8 @@ config:
   numpy_seed: 1234
   torch_seed: 1234
   fewshot_seed: 1234
-git_hash: 3fcf231
-date: 1773175398.6540828
+git_hash: b16853d
+date: 1773180960.1230688
 pretty_env_info: 'PyTorch version: 2.5.1+cu124
 
   Is debug build: False
@@ -544,7 +396,7 @@ pretty_env_info: 'PyTorch version: 2.5.1+cu124
   [conda] triton                      3.1.0                   pypi_0           pypi'
 transformers_version: 5.3.0
 lm_eval_version: 0.4.11
-upper_git_hash: 3fcf231154e3cc6c8abab76aa207c68faeb16199
+upper_git_hash: b16853d920a6c13286d3823fe29528815d80043b
 tokenizer_pad_token:
 - <|endoftext|>
 - '151643'

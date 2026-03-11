@@ -71,6 +71,7 @@ def _get_dataset(args: argparse.Namespace):
 
 
 def _tokenize_and_group(dataset, tokenizer, block_size: int, text_column: str):
+
     def tokenize_fn(batch):
         return tokenizer(batch[text_column])
 

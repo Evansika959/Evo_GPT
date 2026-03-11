@@ -11,9 +11,9 @@ PYTHON_BIN="${PYTHON_BIN:-$DEFAULT_PYTHON}"
 MODEL_ID="${MODEL_ID:-Qwen/Qwen3-1.7B}"
 DEFAULT_TASKS=(
 	hellaswag
-	# arc_easy
-	# arc_challenge
-	# sciq
+	arc_easy
+	arc_challenge
+	sciq
 	winogrande
 	boolq
 )

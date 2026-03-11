@@ -161,7 +161,12 @@ def _load_eval_model(model_id_or_path: str, dtype: torch.dtype, device: str, tru
 
 
 def _model_size_stats(model, eval_dtype: torch.dtype) -> tuple[int, float]:
-    total_params = sum(p.numel() for p in model.parameters())
+    excluded_param_ids = set()
+    input_embeddings = model.get_input_embeddings() if hasattr(model, "get_input_embeddings") else None
+    if input_embeddings is not None and hasattr(input_embeddings, "weight"):
+        excluded_param_ids.add(id(input_embeddings.weight))
+
+    total_params = sum(p.numel() for p in model.parameters() if id(p) not in excluded_param_ids)
     bytes_per_param = torch.tensor([], dtype=eval_dtype).element_size()
     total_mib = (total_params * bytes_per_param) / (1024**2)
     return total_params, total_mib
@@ -266,6 +271,7 @@ def run_ppl_comparison(
     print("\n=== Perplexity Comparison (same eval data + dtype) ===")
     print(f"dataset={dataset_name} config={dataset_config_name} split={dataset_split} samples={ppl_max_samples}")
     print(f"dtype={ppl_dtype} device={resolved_device}")
+    print("params/memory exclude token embedding table")
 
     size_stats = {}
     kv_stats = {}
