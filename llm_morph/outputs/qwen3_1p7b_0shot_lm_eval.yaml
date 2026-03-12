@@ -1,32 +1,73 @@
 results:
-  gsm8k:
-    alias: gsm8k
-    exact_match,strict-match: 0.0
-    exact_match_stderr,strict-match: 0.0
-    exact_match,flexible-extract: 0.40333586050037906
-    exact_match_stderr,flexible-extract: 0.013512654781814702
-  mbpp:
-    alias: mbpp
-    pass_at_1,none: 0.0
-    pass_at_1_stderr,none: 0.0
+  arc_challenge:
+    alias: arc_challenge
+    acc,none: 0.3967576791808874
+    acc_stderr,none: 0.014296513020180639
+    acc_norm,none: 0.4308873720136519
+    acc_norm_stderr,none: 0.014471133392642457
+  boolq:
+    alias: boolq
+    acc,none: 0.7764525993883792
+    acc_stderr,none: 0.007286766045641771
+  hellaswag:
+    alias: hellaswag
+    acc,none: 0.4615614419438359
+    acc_stderr,none: 0.004975014529648622
+    acc_norm,none: 0.6041625174268074
+    acc_norm_stderr,none: 0.004880303863138486
+  openbookqa:
+    alias: openbookqa
+    acc,none: 0.282
+    acc_stderr,none: 0.020143572847290795
+    acc_norm,none: 0.372
+    acc_norm_stderr,none: 0.0216371979857224
+  piqa:
+    alias: piqa
+    acc,none: 0.7252448313384113
+    acc_stderr,none: 0.010415033676676042
+    acc_norm,none: 0.7230685527747551
+    acc_norm_stderr,none: 0.01044049996933453
+  truthfulqa_mc2:
+    alias: truthfulqa_mc2
+    acc,none: 0.458370372783777
+    acc_stderr,none: 0.015489418682670734
+  wikitext:
+    alias: wikitext
+    word_perplexity,none: 21.061538713251995
+    word_perplexity_stderr,none: N/A
+    byte_perplexity,none: 1.7680692207824538
+    byte_perplexity_stderr,none: N/A
+    bits_per_byte,none: 0.8221747580577806
+    bits_per_byte_stderr,none: N/A
+  winogrande:
+    alias: winogrande
+    acc,none: 0.611681136543015
+    acc_stderr,none: 0.01369745665845723
 group_subtasks:
-  gsm8k: []
-  mbpp: []
+  hellaswag: []
+  winogrande: []
+  arc_challenge: []
+  boolq: []
+  piqa: []
+  openbookqa: []
+  truthfulqa_mc2: []
+  wikitext: []
 configs:
-  gsm8k:
-    task: gsm8k
+  arc_challenge:
+    task: arc_challenge
     tag:
-    - math_word_problems
-    dataset_path: openai/gsm8k
-    dataset_name: main
+    - ai2_arc
+    dataset_path: allenai/ai2_arc
+    dataset_name: ARC-Challenge
     training_split: train
+    validation_split: validation
     test_split: test
-    fewshot_split: train
     doc_to_text: 'Question: {{question}}
 
       Answer:'
-    doc_to_target: '{{answer}}'
+    doc_to_target: '{{choices.label.index(answerKey)}}'
     unsafe_code: false
+    doc_to_choice: '{{choices.text}}'
     description: ''
     target_delimiter: ' '
     fewshot_delimiter: '
@@ -35,15 +76,15 @@ configs:
       '
     fewshot_config:
       sampler: default
-      split: train
+      split: null
       process_docs: null
       fewshot_indices: null
       samples: null
       doc_to_text: 'Question: {{question}}
 
         Answer:'
-      doc_to_choice: null
-      doc_to_target: '{{answer}}'
+      doc_to_choice: '{{choices.text}}'
+      doc_to_target: '{{choices.label.index(answerKey)}}'
       gen_prefix: null
       fewshot_delimiter: '
 
@@ -52,127 +93,131 @@ configs:
       target_delimiter: ' '
     num_fewshot: 0
     metric_list:
-    - metric: exact_match
+    - metric: acc
       aggregation: mean
       higher_is_better: true
-      ignore_case: true
-      ignore_punctuation: false
-      regexes_to_ignore:
-      - ','
-      - \$
-      - '(?s).*#### '
-      - \.$
-    output_type: generate_until
-    generation_kwargs:
-      until:
-      - 'Question:'
-      - </s>
-      - <|im_end|>
-      do_sample: false
-      temperature: 0.0
-      max_gen_toks: 256
+    - metric: acc_norm
+      aggregation: mean
+      higher_is_better: true
+    output_type: multiple_choice
     repeats: 1
-    filter_list:
-    - name: strict-match
-      filter:
-      - function: regex
-        regex_pattern: '#### (\-?[0-9\.\,]+)'
-      - function: take_first
-    - name: flexible-extract
-      filter:
-      - function: regex
-        group_select: -1
-        regex_pattern: (-?[$0-9.,]{2,})|(-?[0-9]+)
-      - function: take_first
-    should_decontaminate: false
+    should_decontaminate: true
+    doc_to_decontamination_query: 'Question: {{question}}
+
+      Answer:'
     metadata:
-      version: 3.0
+      version: 1.0
       pretrained: Qwen/Qwen3-1.7B
       dtype: bfloat16
       trust_remote_code: true
       device: cuda
       attn_implementation: sdpa
-  mbpp:
-    task: mbpp
-    dataset_path: google-research-datasets/mbpp
-    dataset_name: full
-    test_split: test
-    doc_to_text: 'You are an expert Python programmer, and here is your task: {{text}}
-      Your code should pass these tests:
+  boolq:
+    task: boolq
+    tag:
+    - super-glue-lm-eval-v1
+    dataset_path: aps/super_glue
+    dataset_name: boolq
+    training_split: train
+    validation_split: validation
+    doc_to_text: '{{passage}}
 
+      Question: {{question}}?
 
-      {{test_list[0]}}
-
-      {{test_list[1]}}
-
-      {{test_list[2]}}
-
-      [BEGIN]
-
-      '
-    doc_to_target: '{% if is_fewshot is defined %}{{code}}
-
-      [DONE]{% else %}{{test_list[0]}}
-
-      {{test_list[1]}}
-
-      {{test_list[2]}}{% endif %}'
-    unsafe_code: true
+      Answer:'
+    doc_to_target: label
+    unsafe_code: false
+    doc_to_choice:
+    - 'no'
+    - 'yes'
     description: ''
-    target_delimiter: ''
+    target_delimiter: ' '
     fewshot_delimiter: '
 
 
       '
     fewshot_config:
-      sampler: first_n
+      sampler: default
       split: null
       process_docs: null
       fewshot_indices: null
-      samples: <function list_fewshot_samples at 0x7dd3a8eec5e0>
-      doc_to_text: 'You are an expert Python programmer, and here is your task: {{text}}
-        Your code should pass these tests:
+      samples: null
+      doc_to_text: '{{passage}}
 
+        Question: {{question}}?
 
-        {{test_list[0]}}
-
-        {{test_list[1]}}
-
-        {{test_list[2]}}
-
-        [BEGIN]
-
-        '
-      doc_to_choice: null
-      doc_to_target: '{% if is_fewshot is defined %}{{code}}
-
-        [DONE]{% else %}{{test_list[0]}}
-
-        {{test_list[1]}}
-
-        {{test_list[2]}}{% endif %}'
+        Answer:'
+      doc_to_choice:
+      - 'no'
+      - 'yes'
+      doc_to_target: label
       gen_prefix: null
       fewshot_delimiter: '
 
 
         '
-      target_delimiter: ''
+      target_delimiter: ' '
     num_fewshot: 0
     metric_list:
-    - metric: "def pass_at_1(\n    references: Union[str, list[str]], predictions:\
-        \ Union[str, list[list[str]]]\n) -> float:\n    if isinstance(references,\
-        \ str):\n        references = [references]\n    if isinstance(predictions[0],\
-        \ str):\n        predictions = [[p] for p in predictions]\n    return pass_at_k.compute(\n\
-        \        references=references,\n        predictions=predictions,\n      \
-        \  k=[1],\n    )[0][\"pass@1\"]\n"
+    - metric: acc
+    output_type: multiple_choice
+    repeats: 1
+    should_decontaminate: true
+    doc_to_decontamination_query: passage
+    metadata:
+      version: 2.0
+      pretrained: Qwen/Qwen3-1.7B
+      dtype: bfloat16
+      trust_remote_code: true
+      device: cuda
+      attn_implementation: sdpa
+  hellaswag:
+    task: hellaswag
+    tag:
+    - multiple_choice
+    dataset_path: Rowan/hellaswag
+    training_split: train
+    validation_split: validation
+    process_docs: "def process_docs(dataset: datasets.Dataset) -> datasets.Dataset:\n\
+      \    def _process_doc(doc):\n        ctx = doc[\"ctx_a\"] + \" \" + doc[\"ctx_b\"\
+      ].capitalize()\n        out_doc = {\n            \"query\": preprocess(doc[\"\
+      activity_label\"] + \": \" + ctx),\n            \"choices\": [preprocess(ending)\
+      \ for ending in doc[\"endings\"]],\n            \"gold\": int(doc[\"label\"\
+      ]),\n        }\n        return out_doc\n\n    return dataset.map(_process_doc)\n"
+    doc_to_text: '{{query}}'
+    doc_to_target: '{{label}}'
+    unsafe_code: false
+    doc_to_choice: choices
+    description: ''
+    target_delimiter: ' '
+    fewshot_delimiter: '
+
+
+      '
+    fewshot_config:
+      sampler: default
+      split: null
+      process_docs: <function process_docs at 0x72b67d620c10>
+      fewshot_indices: null
+      samples: null
+      doc_to_text: '{{query}}'
+      doc_to_choice: choices
+      doc_to_target: '{{label}}'
+      gen_prefix: null
+      fewshot_delimiter: '
+
+
+        '
+      target_delimiter: ' '
+    num_fewshot: 0
+    metric_list:
+    - metric: acc
       aggregation: mean
       higher_is_better: true
-    output_type: generate_until
-    generation_kwargs:
-      until:
-      - '[DONE]'
-      do_sample: false
-      max_gen_toks: 256
+    - metric: acc_norm
+      aggregation: mean
+      higher_is_better: true
+    output_type: multiple_choice
     repeats: 1
     should_decontaminate: false
     metadata:
@@ -182,24 +227,420 @@ configs:
       trust_remote_code: true
       device: cuda
       attn_implementation: sdpa
+  openbookqa:
+    task: openbookqa
+    dataset_path: allenai/openbookqa
+    dataset_name: main
+    training_split: train
+    validation_split: validation
+    test_split: test
+    doc_to_text: question_stem
+    doc_to_target: '{{choices.label.index(answerKey.lstrip())}}'
+    unsafe_code: false
+    doc_to_choice: '{{choices.text}}'
+    description: ''
+    target_delimiter: ' '
+    fewshot_delimiter: '
+
+
+      '
+    fewshot_config:
+      sampler: default
+      split: null
+      process_docs: null
+      fewshot_indices: null
+      samples: null
+      doc_to_text: question_stem
+      doc_to_choice: '{{choices.text}}'
+      doc_to_target: '{{choices.label.index(answerKey.lstrip())}}'
+      gen_prefix: null
+      fewshot_delimiter: '
+
+
+        '
+      target_delimiter: ' '
+    num_fewshot: 0
+    metric_list:
+    - metric: acc
+      aggregation: mean
+      higher_is_better: true
+    - metric: acc_norm
+      aggregation: mean
+      higher_is_better: true
+    output_type: multiple_choice
+    repeats: 1
+    should_decontaminate: true
+    doc_to_decontamination_query: question_stem
+    metadata:
+      version: 1.0
+      pretrained: Qwen/Qwen3-1.7B
+      dtype: bfloat16
+      trust_remote_code: true
+      device: cuda
+      attn_implementation: sdpa
+  piqa:
+    task: piqa
+    dataset_path: baber/piqa
+    training_split: train
+    validation_split: validation
+    doc_to_text: 'Question: {{goal}}
+
+      Answer:'
+    doc_to_target: label
+    unsafe_code: false
+    doc_to_choice: '{{[sol1, sol2]}}'
+    description: ''
+    target_delimiter: ' '
+    fewshot_delimiter: '
+
+
+      '
+    fewshot_config:
+      sampler: default
+      split: null
+      process_docs: null
+      fewshot_indices: null
+      samples: null
+      doc_to_text: 'Question: {{goal}}
+
+        Answer:'
+      doc_to_choice: '{{[sol1, sol2]}}'
+      doc_to_target: label
+      gen_prefix: null
+      fewshot_delimiter: '
+
+
+        '
+      target_delimiter: ' '
+    num_fewshot: 0
+    metric_list:
+    - metric: acc
+      aggregation: mean
+      higher_is_better: true
+    - metric: acc_norm
+      aggregation: mean
+      higher_is_better: true
+    output_type: multiple_choice
+    repeats: 1
+    should_decontaminate: true
+    doc_to_decontamination_query: goal
+    metadata:
+      version: 1.0
+      pretrained: Qwen/Qwen3-1.7B
+      dtype: bfloat16
+      trust_remote_code: true
+      device: cuda
+      attn_implementation: sdpa
+  truthfulqa_mc2:
+    task: truthfulqa_mc2
+    tag:
+    - truthfulqa
+    dataset_path: truthfulqa/truthful_qa
+    dataset_name: multiple_choice
+    validation_split: validation
+    doc_to_text: '{% set prompt_qa = ''Q: What is human life expectancy in the United
+      States?
+
+      A: Human life expectancy in the United States is 78 years.
+
+
+      Q: Who was president of the United States in 1955?
+
+      A: Dwight D. Eisenhower was president of the United States in 1955.
+
+
+      Q: Which party did he belong to?
+
+      A: He belonged to the Republican Party.
+
+
+      Q: What is the square root of banana?
+
+      A: I have no comment.
+
+
+      Q: How does a telescope work?
+
+      A: Telescopes use lenses or mirrors to focus light and make objects appear closer.
+
+
+      Q: Where were the 1992 Olympics held?
+
+      A: The 1992 Olympics were held in Barcelona, Spain.''%}{{prompt_qa + ''
+
+
+      Q: '' + question + ''
+
+      A:''}}'
+    doc_to_target: 0
+    unsafe_code: false
+    doc_to_choice: '{{mc2_targets.choices}}'
+    process_results: "def process_results_mc2(doc, results):\n    ll, _ = zip(*results)\n\
+      \    ll = np.array(ll)\n\n    # Convert log-likelihoods to probabilities.\n\
+      \    probs = np.exp(ll)\n\n    # Normalize probabilities.\n    probs_norm =\
+      \ probs / np.sum(probs)\n\n    labels = np.array(doc[\"mc2_targets\"][\"labels\"\
+      ])\n    # Compute the normalized probability mass for the correct answer.\n\
+      \    pm_true = np.sum(probs_norm[labels == 1])\n\n    return {\"acc\": pm_true}\n"
+    description: ''
+    target_delimiter: ' '
+    fewshot_delimiter: '
+
+
+      '
+    fewshot_config:
+      sampler: default
+      split: null
+      process_docs: null
+      fewshot_indices: null
+      samples: null
+      doc_to_text: '{% set prompt_qa = ''Q: What is human life expectancy in the United
+        States?
+
+        A: Human life expectancy in the United States is 78 years.
+
+
+        Q: Who was president of the United States in 1955?
+
+        A: Dwight D. Eisenhower was president of the United States in 1955.
+
+
+        Q: Which party did he belong to?
+
+        A: He belonged to the Republican Party.
+
+
+        Q: What is the square root of banana?
+
+        A: I have no comment.
+
+
+        Q: How does a telescope work?
+
+        A: Telescopes use lenses or mirrors to focus light and make objects appear
+        closer.
+
+
+        Q: Where were the 1992 Olympics held?
+
+        A: The 1992 Olympics were held in Barcelona, Spain.''%}{{prompt_qa + ''
+
+
+        Q: '' + question + ''
+
+        A:''}}'
+      doc_to_choice: '{{mc2_targets.choices}}'
+      doc_to_target: 0
+      gen_prefix: null
+      fewshot_delimiter: '
+
+
+        '
+      target_delimiter: ' '
+    num_fewshot: 0
+    metric_list:
+    - metric: acc
+      aggregation: mean
+      higher_is_better: true
+    output_type: multiple_choice
+    repeats: 1
+    should_decontaminate: true
+    doc_to_decontamination_query: question
+    metadata:
+      version: 3.0
+      pretrained: Qwen/Qwen3-1.7B
+      dtype: bfloat16
+      trust_remote_code: true
+      device: cuda
+      attn_implementation: sdpa
+  wikitext:
+    task: wikitext
+    dataset_path: EleutherAI/wikitext_document_level
+    dataset_name: wikitext-2-raw-v1
+    training_split: train
+    validation_split: validation
+    test_split: test
+    doc_to_text: ''
+    doc_to_target: "def wikitext_detokenizer(doc):\n    string = doc[\"page\"]\n \
+      \   # contractions\n    string = string.replace(\"s '\", \"s'\")\n    string\
+      \ = re.sub(r\"/' [0-9]/\", r\"/'[0-9]/\", string)\n    # number separators\n\
+      \    string = string.replace(\" @-@ \", \"-\")\n    string = string.replace(\"\
+      \ @,@ \", \",\")\n    string = string.replace(\" @.@ \", \".\")\n    # punctuation\n\
+      \    string = string.replace(\" : \", \": \")\n    string = string.replace(\"\
+      \ ; \", \"; \")\n    string = string.replace(\" . \", \". \")\n    string =\
+      \ string.replace(\" ! \", \"! \")\n    string = string.replace(\" ? \", \"?\
+      \ \")\n    string = string.replace(\" , \", \", \")\n    # double brackets\n\
+      \    string = re.sub(r\"\\(\\s*([^\\)]*?)\\s*\\)\", r\"(\\1)\", string)\n  \
+      \  string = re.sub(r\"\\[\\s*([^\\]]*?)\\s*\\]\", r\"[\\1]\", string)\n    string\
+      \ = re.sub(r\"{\\s*([^}]*?)\\s*}\", r\"{\\1}\", string)\n    string = re.sub(r\"\
+      \\\"\\s*([^\\\"]*?)\\s*\\\"\", r'\"\\1\"', string)\n    string = re.sub(r\"\
+      '\\s*([^']*?)\\s*'\", r\"'\\1'\", string)\n    # miscellaneous\n    string =\
+      \ string.replace(\"= = = =\", \"====\")\n    string = string.replace(\"= = =\"\
+      , \"===\")\n    string = string.replace(\"= =\", \"==\")\n    string = string.replace(\"\
+      \ \" + chr(176) + \" \", chr(176))\n    string = string.replace(\" \\n\", \"\
+      \\n\")\n    string = string.replace(\"\\n \", \"\\n\")\n    string = string.replace(\"\
+      \ N \", \" 1 \")\n    string = string.replace(\" 's\", \"'s\")\n\n    return\
+      \ string\n"
+    unsafe_code: false
+    process_results: "def process_results(doc, results):\n    (loglikelihood,) = results\n\
+      \    # IMPORTANT: wikitext counts number of words in *original doc before detokenization*\n\
+      \    _words = len(re.split(r\"\\s+\", doc[\"page\"]))\n    _bytes = len(doc[\"\
+      page\"].encode(\"utf-8\"))\n    return {\n        \"word_perplexity\": (loglikelihood,\
+      \ _words),\n        \"byte_perplexity\": (loglikelihood, _bytes),\n        \"\
+      bits_per_byte\": (loglikelihood, _bytes),\n    }\n"
+    description: ''
+    target_delimiter: ' '
+    fewshot_delimiter: '
+
+
+      '
+    fewshot_config:
+      sampler: default
+      split: null
+      process_docs: null
+      fewshot_indices: null
+      samples: null
+      doc_to_text: ''
+      doc_to_choice: null
+      doc_to_target: <function wikitext_detokenizer at 0x72b64e349a20>
+      gen_prefix: null
+      fewshot_delimiter: '
+
+
+        '
+      target_delimiter: ' '
+    num_fewshot: 0
+    metric_list:
+    - metric: word_perplexity
+    - metric: byte_perplexity
+    - metric: bits_per_byte
+    output_type: loglikelihood_rolling
+    repeats: 1
+    should_decontaminate: true
+    doc_to_decontamination_query: '{{page}}'
+    metadata:
+      version: 2.0
+      pretrained: Qwen/Qwen3-1.7B
+      dtype: bfloat16
+      trust_remote_code: true
+      device: cuda
+      attn_implementation: sdpa
+  winogrande:
+    task: winogrande
+    dataset_path: allenai/winogrande
+    dataset_name: winogrande_xl
+    training_split: train
+    validation_split: validation
+    doc_to_text: "def doc_to_text(doc):\n    answer_to_num = {\"1\": 0, \"2\": 1}\n\
+      \    return answer_to_num[doc[\"answer\"]]\n"
+    doc_to_target: "def doc_to_target(doc):\n    idx = doc[\"sentence\"].index(\"\
+      _\") + 1\n    return doc[\"sentence\"][idx:].strip()\n"
+    unsafe_code: false
+    doc_to_choice: "def doc_to_choice(doc):\n    idx = doc[\"sentence\"].index(\"\
+      _\")\n    options = [doc[\"option1\"], doc[\"option2\"]]\n    return [doc[\"\
+      sentence\"][:idx] + opt for opt in options]\n"
+    description: ''
+    target_delimiter: ' '
+    fewshot_delimiter: '
+
+
+      '
+    fewshot_config:
+      sampler: default
+      split: null
+      process_docs: null
+      fewshot_indices: null
+      samples: null
+      doc_to_text: <function doc_to_text at 0x72b64fe40af0>
+      doc_to_choice: <function doc_to_choice at 0x72b64fe40f70>
+      doc_to_target: <function doc_to_target at 0x72b64fe40d30>
+      gen_prefix: null
+      fewshot_delimiter: '
+
+
+        '
+      target_delimiter: ' '
+    num_fewshot: 0
+    metric_list:
+    - metric: acc
+      aggregation: mean
+      higher_is_better: true
+    output_type: multiple_choice
+    repeats: 1
+    should_decontaminate: true
+    doc_to_decontamination_query: sentence
+    metadata:
+      version: 1.0
+      pretrained: Qwen/Qwen3-1.7B
+      dtype: bfloat16
+      trust_remote_code: true
+      device: cuda
+      attn_implementation: sdpa
 versions:
-  gsm8k: 3.0
-  mbpp: 1.0
+  arc_challenge: 1.0
+  boolq: 2.0
+  hellaswag: 1.0
+  openbookqa: 1.0
+  piqa: 1.0
+  truthfulqa_mc2: 3.0
+  wikitext: 2.0
+  winogrande: 1.0
 n-shot:
-  gsm8k: 0
-  mbpp: 0
+  arc_challenge: 0
+  boolq: 0
+  hellaswag: 0
+  openbookqa: 0
+  piqa: 0
+  truthfulqa_mc2: 0
+  wikitext: 0
+  winogrande: 0
 higher_is_better:
-  gsm8k:
-    exact_match: true
-  mbpp:
-    pass_at_1: true
+  arc_challenge:
+    acc: true
+    acc_norm: true
+  boolq:
+    acc: true
+  hellaswag:
+    acc: true
+    acc_norm: true
+  openbookqa:
+    acc: true
+    acc_norm: true
+  piqa:
+    acc: true
+    acc_norm: true
+  truthfulqa_mc2:
+    acc: true
+  wikitext:
+    word_perplexity: false
+    byte_perplexity: false
+    bits_per_byte: false
+  winogrande:
+    acc: true
 n-samples:
-  mbpp:
+  wikitext:
+    original: 62
+    effective: 62
+  truthfulqa_mc2:
+    original: 817
+    effective: 817
+  openbookqa:
     original: 500
     effective: 500
-  gsm8k:
-    original: 1319
-    effective: 1319
+  piqa:
+    original: 1838
+    effective: 1838
+  boolq:
+    original: 3270
+    effective: 3270
+  arc_challenge:
+    original: 1172
+    effective: 1172
+  winogrande:
+    original: 1267
+    effective: 1267
+  hellaswag:
+    original: 10042
+    effective: 10042
 config:
   model: hf
   model_args: pretrained=Qwen/Qwen3-1.7B,dtype=bfloat16,trust_remote_code=true,device=cuda,attn_implementation=sdpa
@@ -207,21 +648,19 @@ config:
   model_dtype: torch.bfloat16
   model_revision: main
   model_sha: 70d244cc86ccca08cf5af4e1e306ecf908b1ad5e
-  batch_size: 64
+  batch_size: 4
   batch_sizes: []
   device: null
   use_cache: null
   limit: null
   bootstrap_iters: 100000
-  gen_kwargs:
-    max_gen_toks: 256
-    do_sample: false
+  gen_kwargs: null
   random_seed: 0
   numpy_seed: 1234
   torch_seed: 1234
   fewshot_seed: 1234
-git_hash: 1e9e644
-date: 1773268856.351309
+git_hash: a3db71a
+date: 1773285985.0976896
 pretty_env_info: 'PyTorch version: 2.5.1+cu124
 
   Is debug build: False
@@ -390,7 +829,7 @@ pretty_env_info: 'PyTorch version: 2.5.1+cu124
   [conda] triton                      3.1.0                   pypi_0           pypi'
 transformers_version: 5.3.0
 lm_eval_version: 0.4.11
-upper_git_hash: 1e9e644816ab029b88151186480af1400ad89f80
+upper_git_hash: a3db71a151d9f0da820ce1798902c7613cd03877
 tokenizer_pad_token:
 - <|endoftext|>
 - '151643'

@@ -11,7 +11,7 @@ PYTHON_BIN="${PYTHON_BIN:-python3}"
 
 DEFAULT_BENCHMARKS=(
 	gsm8k
-	mbpp
+	# mbpp
 )
 
 if [[ -n "${BENCHMARKS:-}" ]]; then
@@ -50,8 +50,8 @@ fi
 
 DEVICE="${DEVICE:-cuda}"
 DTYPE="${DTYPE:-bfloat16}"
-NUM_FEWSHOT="${NUM_FEWSHOT:-0}"
-BATCH_SIZE="${BATCH_SIZE:-32}"
+NUM_FEWSHOT="${NUM_FEWSHOT:-5}"
+BATCH_SIZE="${BATCH_SIZE:-64}"
 MAX_GEN_TOKS="${MAX_GEN_TOKS:-1024}"
 EXP_NAME="${EXP_NAME:-kvgroup_only}"
 

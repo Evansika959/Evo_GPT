@@ -13,8 +13,8 @@ PYTHON_BIN="${PYTHON_BIN:-$DEFAULT_PYTHON}"
 
 MODEL_ID="${MODEL_ID:-Qwen/Qwen3-1.7B}"
 DEFAULT_TASKS=(
-	gsm8k
-	# mbpp
+	# gsm8k
+	mbpp
 )
 
 if [[ -n "${TASKS:-}" ]]; then
@@ -22,7 +22,7 @@ if [[ -n "${TASKS:-}" ]]; then
 else
 	TASKS="$(IFS=,; echo "${DEFAULT_TASKS[*]}")"
 fi
-NUM_FEWSHOT="${NUM_FEWSHOT:-5}"
+NUM_FEWSHOT="${NUM_FEWSHOT:-3}"
 BATCH_SIZE="${BATCH_SIZE:-16}"
 DEVICE="${DEVICE:-cuda}"
 DTYPE="${DTYPE:-bfloat16}"
