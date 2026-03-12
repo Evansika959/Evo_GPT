@@ -25,6 +25,8 @@
 /llm_morph/qwen3_iha_uptrain_smoke/
 /llm_morph/qwen3_morph_uptrain/
 /llm_morph/morphed_trial/
+/outputs/
+/llm_morph/outputs/
 
 
 __pycache__/
