@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import inspect
+import math
 import os
 from pathlib import Path
 from typing import Any
@@ -128,6 +129,86 @@ def _make_yaml_safe(value: Any) -> Any:
     return str(value)
 
 
+def _is_stderr_metric(metric_name: str) -> bool:
+    base = metric_name.split(",", 1)[0]
+    return base.endswith("_stderr")
+
+
+def _paired_stderr_key(metric_name: str) -> str:
+    if "," in metric_name:
+        base, suffix = metric_name.split(",", 1)
+        return f"{base}_stderr,{suffix}"
+    return f"{metric_name}_stderr"
+
+
+def _format_metric_value(value: Any) -> str:
+    if value is None:
+        return "-"
+    if isinstance(value, str):
+        return value
+    if isinstance(value, bool):
+        return str(value)
+    if isinstance(value, (int, float)):
+        if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+            return "N/A"
+        abs_value = abs(float(value))
+        if abs_value >= 100:
+            return f"{value:.2f}"
+        if abs_value >= 1:
+            return f"{value:.4f}"
+        return f"{value:.6f}"
+    return str(value)
+
+
+def _print_summary_table(summary: dict[str, Any]) -> None:
+    rows: list[tuple[str, str, str, str]] = []
+    preferred_keys = {"acc", "acc_norm", "exact_match", "f1", "bits_per_byte", "byte_perplexity", "word_perplexity"}
+
+    for task_name, metrics in summary.items():
+        if not isinstance(metrics, dict):
+            continue
+
+        selected_keys = [
+            key
+            for key in metrics.keys()
+            if (key.endswith(",none") or key in preferred_keys) and not _is_stderr_metric(key)
+        ]
+        if not selected_keys:
+            selected_keys = [key for key in metrics.keys() if not _is_stderr_metric(key)]
+
+        for key in selected_keys:
+            value = metrics.get(key)
+            stderr_value = metrics.get(_paired_stderr_key(key))
+            rows.append(
+                (
+                    task_name,
+                    key,
+                    _format_metric_value(value),
+                    _format_metric_value(stderr_value) if stderr_value is not None else "-",
+                )
+            )
+
+    if not rows:
+        print("No task results found.")
+        return
+
+    headers = ("Task", "Metric", "Value", "StdErr")
+    widths = [len(h) for h in headers]
+    for row in rows:
+        for idx, cell in enumerate(row):
+            widths[idx] = max(widths[idx], len(cell))
+
+    def _fmt_row(cells: tuple[str, str, str, str]) -> str:
+        return " | ".join(cell.ljust(widths[idx]) for idx, cell in enumerate(cells))
+
+    separator = "-+-".join("-" * w for w in widths)
+    print("\n=== LM-eval style summary ===")
+    print(_fmt_row(headers))
+    print(separator)
+    for row in rows:
+        print(_fmt_row(row))
+
+
 def main() -> None:
     args = parse_args()
     resolved_device = _resolve_device(args.device)
@@ -168,19 +249,7 @@ def main() -> None:
     results = evaluator.simple_evaluate(**eval_kwargs)
 
     summary = results.get("results", {})
-    if not summary:
-        print("No task results found.")
-    else:
-        print("\n=== LM-eval style summary ===")
-        for task_name, metrics in summary.items():
-            printable = {
-                key: value
-                for key, value in metrics.items()
-                if key.endswith(",none") or key in {"acc", "acc_norm", "exact_match", "f1"}
-            }
-            if not printable:
-                printable = metrics
-            print(f"{task_name}: {yaml.safe_dump(_make_yaml_safe(printable), sort_keys=True, default_flow_style=True).strip()}")
+    _print_summary_table(summary)
 
     safe_results = _make_yaml_safe(results)
 

@@ -59,7 +59,6 @@ BATCH_SIZE="${BATCH_SIZE:-64}"
 EXP_NAME="${EXP_NAME:-kvgroup_only}"
 
 UPTRAIN_OUTPUT_DIR="${UPTRAIN_OUTPUT_DIR:-./qwen3_morph_uptrain/${EXP_NAME}}"
-UPTRAIN_OUTPUT_DIR="${UPTRAIN_OUTPUT_DIR:-./qwen3_iha_uptrain}"
 
 
 if [[ -d "$UPTRAIN_OUTPUT_DIR/phase2" && -f "$UPTRAIN_OUTPUT_DIR/phase2/config.json" ]]; then

@@ -5,8 +5,8 @@ ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT_DIR"
 
 EXP_NAME="front_mlp"
-# DATASET_NAME="JeanKaddour/minipile"
-DATASET_NAME="Skylion007/openwebtext"
+DATASET_NAME="JeanKaddour/minipile"
+# DATASET_NAME="Skylion007/openwebtext"
 
 
 MODEL_DIR="${MODEL_DIR:-./morphed_trial/${EXP_NAME}/}"

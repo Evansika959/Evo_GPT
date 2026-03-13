@@ -11,10 +11,10 @@ if [[ -z "$DEFAULT_PYTHON" ]]; then
 fi
 PYTHON_BIN="${PYTHON_BIN:-$DEFAULT_PYTHON}"
 
-MODEL_ID="${MODEL_ID:-Qwen/Qwen3-1.7B}"
+MODEL_ID="${MODEL_ID:-Qwen/Qwen3-1.7B-Base}"
 DEFAULT_TASKS=(
-	# gsm8k
-	mbpp
+	gsm8k
+	# mbpp
 )
 
 if [[ -n "${TASKS:-}" ]]; then
@@ -22,12 +22,12 @@ if [[ -n "${TASKS:-}" ]]; then
 else
 	TASKS="$(IFS=,; echo "${DEFAULT_TASKS[*]}")"
 fi
-NUM_FEWSHOT="${NUM_FEWSHOT:-3}"
+NUM_FEWSHOT="${NUM_FEWSHOT:-5}"
 BATCH_SIZE="${BATCH_SIZE:-16}"
 DEVICE="${DEVICE:-cuda}"
 DTYPE="${DTYPE:-bfloat16}"
 MAX_GEN_TOKS="${MAX_GEN_TOKS:-1024}"
-OUTPUT_YAML="${OUTPUT_YAML:-$SCRIPT_DIR/outputs/qwen3_1p7b_0shot_gen_lm_eval.yaml}"
+OUTPUT_YAML="${OUTPUT_YAML:-$SCRIPT_DIR/outputs/${MODEL_ID}_gen_lm_eval.yaml}"
 
 mkdir -p "$(dirname "$OUTPUT_YAML")"
 

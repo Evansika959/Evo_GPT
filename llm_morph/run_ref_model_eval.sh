@@ -8,7 +8,7 @@ if [[ -z "$DEFAULT_PYTHON" ]]; then
 fi
 PYTHON_BIN="${PYTHON_BIN:-$DEFAULT_PYTHON}"
 
-MODEL_ID="${MODEL_ID:-Qwen/Qwen3-1.7B}"
+MODEL_ID="${MODEL_ID:-HuggingFaceTB/SmolLM2-1.7B}"
 DEFAULT_TASKS=(
 	hellaswag
 	winogrande
@@ -29,7 +29,7 @@ NUM_FEWSHOT="${NUM_FEWSHOT:-0}"
 BATCH_SIZE="${BATCH_SIZE:-4}"
 DEVICE="${DEVICE:-cuda}"
 DTYPE="${DTYPE:-bfloat16}"
-OUTPUT_YAML="${OUTPUT_YAML:-$SCRIPT_DIR/outputs/qwen3_1p7b_0shot_lm_eval.yaml}"
+OUTPUT_YAML="${OUTPUT_YAML:-$SCRIPT_DIR/outputs/${MODEL_ID}_0shot_lm_eval.yaml}"
 
 mkdir -p "$(dirname "$OUTPUT_YAML")"
 

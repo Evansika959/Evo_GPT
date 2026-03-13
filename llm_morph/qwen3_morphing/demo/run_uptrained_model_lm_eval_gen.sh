@@ -51,12 +51,11 @@ fi
 DEVICE="${DEVICE:-cuda}"
 DTYPE="${DTYPE:-bfloat16}"
 NUM_FEWSHOT="${NUM_FEWSHOT:-5}"
-BATCH_SIZE="${BATCH_SIZE:-64}"
+BATCH_SIZE="${BATCH_SIZE:-32}"
 MAX_GEN_TOKS="${MAX_GEN_TOKS:-1024}"
 EXP_NAME="${EXP_NAME:-kvgroup_only}"
 
 UPTRAIN_OUTPUT_DIR="${UPTRAIN_OUTPUT_DIR:-./qwen3_morph_uptrain/${EXP_NAME}}"
-UPTRAIN_OUTPUT_DIR="${UPTRAIN_OUTPUT_DIR:-./qwen3_iha_uptrain}"
 
 if [[ -d "$UPTRAIN_OUTPUT_DIR/phase2" && -f "$UPTRAIN_OUTPUT_DIR/phase2/config.json" ]]; then
 	UPTRAINED_MODEL_DIR="$UPTRAIN_OUTPUT_DIR/phase2"
