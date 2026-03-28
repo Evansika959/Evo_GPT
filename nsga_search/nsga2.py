@@ -401,7 +401,7 @@ class Population:
             elapsed_time = time.time() - start_time
             print(f"Finished HW evaluation for generation {self.gen} in {elapsed_time:.1f}s")
             print("====================================================")
-        trainer.wait_for_all(poll_interval=120, timeout=timeout, verbose=True)
+        trainer.wait_for_all(poll_interval=600, timeout=timeout, verbose=True)
         data_csv = trainer.fetch_results(local_dir="train", gen=self.gen)
         # read the csv and populate self.evaluations
         # load the csv file's second column as a list of floats
@@ -647,9 +647,16 @@ class Population:
                 for layer_idx in range(max_layers):
                     for key in layer_keys:
                         fieldnames.append(f'layer{layer_idx}_{key}')
-            # add evaluation fields
+            # add evaluation fields (union of all aux keys across evaluations)
+            aux_keys = []
             if self.evaluations:
-                aux_keys = list(self.evaluations[0].aux.keys())
+                seen = set()
+                for ev in self.evaluations:
+                    if ev:
+                        for key in ev.aux.keys():
+                            if key not in seen:
+                                seen.add(key)
+                                aux_keys.append(key)
                 for key in aux_keys:
                     fieldnames.append(key)
 

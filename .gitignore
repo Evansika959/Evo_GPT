@@ -16,3 +16,17 @@
 /nsga_search/__pycache__/
 /nsga_search/bash_scripts
 /nsga_search/csv/
+
+# llm_morph local artifacts
+/llm_morph/__pycache__/
+/llm_morph/qwen3_morphing/__pycache__/
+/llm_morph/morphed_output/
+/llm_morph/qwen3_iha_uptrain/
+/llm_morph/qwen3_iha_uptrain_smoke/
+/llm_morph/qwen3_morph_uptrain/
+/llm_morph/morphed_trial/
+/outputs/
+/llm_morph/outputs/
+
+
+__pycache__/
