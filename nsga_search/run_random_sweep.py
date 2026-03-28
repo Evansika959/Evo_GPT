@@ -125,6 +125,7 @@ def main():
     parser.add_argument("--conda_env", type=str, default="reallmforge", help="Conda environment name on remote hosts")
     parser.add_argument("--max_iters", type=int, default=10000, help="Max training iterations per evaluation")
     parser.add_argument("--log_steps", type=int, default=5, help="Logging steps interval during training")
+    parser.add_argument("--dataset", type=str, default="minipile", help="Dataset name for training evaluations")
     parser.add_argument(
         "--search_space_config",
         type=str,
@@ -175,7 +176,13 @@ def main():
         population = Population(individuals, search_space=search_space)
         population.n_population = init_population_size
         print(f"\n\n================ Round {i} ================\n")
-        population.sw_eval(hosts=hosts, user=user, key_filename=key_filename, run_dir_name=exp_name, conda_env=args.conda_env, max_iters=args.max_iters, sw_only=sw_only)
+        population.sw_eval(hosts=hosts, user=user, 
+                           key_filename=key_filename, 
+                           run_dir_name=exp_name, 
+                           conda_env=args.conda_env, 
+                           max_iters=args.max_iters, 
+                           dataset=args.dataset,
+                           sw_only=sw_only)
         population.print_summary()
         
         entire_population.append_population(added_individuals=population.individuals, added_evaluations=population.evaluations)
