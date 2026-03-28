@@ -129,6 +129,7 @@ def main():
     parser.add_argument("--crossover_rate", type=float, default=0.9, help="Crossover rate for NSGA-II")
     parser.add_argument("--mutation_rate", type=float, default=0.1, help="Mutation rate for NSGA-II")
     parser.add_argument("--dataset", type=str, default="minipile", help="Dataset name for training evaluations")
+    parser.add_argument("--timeout", type=int, default=10000, help="Timeout in seconds for each remote evaluation")
     parser.add_argument(
         "--search_space_config",
         type=str,
@@ -243,7 +244,8 @@ def main():
                            conda_env=args.conda_env, 
                            max_iters=args.max_iters, 
                            dataset=args.dataset, 
-                           sw_only=sw_only)
+                           sw_only=sw_only,
+                           timeout=args.timeout)
         population.print_summary()
 
     # nsga parameters defined here
@@ -275,7 +277,8 @@ def main():
                            conda_env=args.conda_env, 
                            max_iters=args.max_iters, 
                            dataset=args.dataset, 
-                           sw_only=sw_only)
+                           sw_only=sw_only,
+                           timeout=args.timeout)
         population.save_checkpoint(f"ckpts/{exp_name}/{run_time}_ckpt_offspring_gen{gen}.json")
         population.update_elimination()
         population.print_summary()
