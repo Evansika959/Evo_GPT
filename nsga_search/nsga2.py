@@ -382,6 +382,51 @@ class Population:
 
         return hw_data
 
+    def apply_pred_loss(self, pred_loss: List[float]) -> None:
+        """Populate evaluations from surrogate-predicted val_loss + analytical metrics."""
+        if self.gen == 0:
+            self.evaluations = []
+        else:
+            self.offspring_evaluations = []
+
+        if self.objs_settings is None:
+            self.objs_settings = ["val_loss", "params"]
+        if self.cons_settings is None:
+            self.cons_settings = {
+                "params": 800_000_000,
+                "val_loss": 3.6,
+            }
+
+        for i, ind in enumerate(self.individuals if self.gen == 0 else self.offspring):
+            sw_res = pred_loss[i] if i < len(pred_loss) else float("inf")
+            params = ind.estimate_params()
+            mem_bytes = ind.estimate_mem_access()
+            flops = ind.estimate_flops()
+            kv_cache_size = ind.estimate_kv_cache_size()
+            auxs = {
+                "val_loss": sw_res,
+                "params": params / 1e6,
+                "mem_bytes": mem_bytes,
+                "flops": flops / 1e3,
+                "kv_cache_size": kv_cache_size / 1e6,
+            }
+
+            for key in self.objs_settings:
+                if key not in auxs or auxs[key] is None:
+                    auxs[key] = float("inf")
+            for key in self.cons_settings.keys():
+                if key not in auxs or auxs[key] is None:
+                    auxs[key] = float("inf")
+
+            objs = [float(auxs[obj]) for obj in self.objs_settings]
+            cons = [float(auxs[con]) - self.cons_settings[con] for con in self.cons_settings.keys()]
+
+            eval_res = EvaluationResult(objs, cons, auxs)
+            if self.gen == 0:
+                self.evaluations.append(eval_res)
+            else:
+                self.offspring_evaluations.append(eval_res)
+
     def sw_eval(self, hosts: List[str], user: str, key_filename: str, run_dir_name: str, max_iters: int = 10000, conda_env: str = "reallmforge", sw_only: bool = False, hw_eval_on_reallmasic: bool = False, timeout: int = 10000, dataset: str = "minipile") -> None:
         # send the training work to worker nodes and wait for results
         train_yaml_path = self.to_yaml(save_path="train")

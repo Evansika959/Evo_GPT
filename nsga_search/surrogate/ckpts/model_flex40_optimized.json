@@ -1,0 +1,26 @@
+{
+  "model": {
+    "d_model": 64,
+    "nhead": 4,
+    "num_layers": 4,
+    "max_layers": 40,
+    "dropout": 0.2
+  },
+  "training": {
+    "csv_paths": [
+      "data/flex_layer_40.csv",
+      "data/flex_layer_40_no_identity.csv",
+      "data/flex_layer_random240.csv"
+    ],
+    "epochs": 200,
+    "batch_size": 32,
+    "lr": 0.0001,
+    "seed": 42,
+    "test_ratio": 0.2,
+    "n_train": 1318,
+    "n_test": 330
+  },
+  "results": {
+    "best_test_l1": 0.2404
+  }
+}

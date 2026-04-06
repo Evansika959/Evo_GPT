@@ -2,6 +2,7 @@
 /nsga_search/ckpts/
 /nsga_search/train/
 /nsga_search/logs/
+/nsga_search/logs_/
 /nsga_search/plots/
 /nsga_search/bash_scripts/
 /nsga_search/htmls/
