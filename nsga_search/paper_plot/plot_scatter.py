@@ -1,0 +1,206 @@
+import numpy as np
+import pandas as pd
+from nsga2 import Population
+import json, os
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+
+def get_pareto_front(obj1, obj2):
+    """Identify the Pareto front from a set of points."""
+    points = np.array(list(zip(obj1, obj2)))
+    is_pareto = np.ones(points.shape[0], dtype=bool)
+    for i, point in enumerate(points):
+        if is_pareto[i]:
+            is_pareto[is_pareto] = np.any(points[is_pareto] < point, axis=1)  # Keep any point with a lower value
+            is_pareto[i] = True  # And keep self
+    return points[is_pareto]
+
+def plot_gen_scatter(
+    file_name_base: str,
+    save_path: str,
+    start_gen: int,
+    end_gen: int,
+    ckpt_gen: int,
+    ref_csv: str = None,
+    x_axis: str = 'params',
+    y_axis: str = 'validation_loss',
+    color_axis: str = 'generation',
+    cmap: str = 'Blues',           # blue (light to dark) sequential colormap
+    fix_color_scale: bool = True,  # normalize color scale using global min/max
+    point_size: float = 10,       # size of scatter markers (points^2)
+    cmap_min: float = 0.2,        # lower bound of colormap (0..1); raise to avoid too-light colors
+    cmap_max: float = 1.0         # upper bound of colormap (0..1)
+):
+    pop_data = []
+    generations = list(range(start_gen, end_gen + 1))
+    for gen in generations:
+        json_file_name = f"{file_name_base}{gen}.json"
+        if not os.path.exists(json_file_name):
+
+            print(f"❌ Checkpoint file not found: {json_file_name}")
+            exit(f"❌ Checkpoint file not found: {json_file_name}\nPlease ensure all generation checkpoint files are present.")
+                
+        population = Population.load_checkpoint(json_file_name, from_pkl=False)
+
+        val_loss_vals = [eva.aux["val_loss"] for eva in population.evaluations ]
+        # energy_vals = [eva.aux["energy_per_token"] for eva in population.evaluations ]
+        # ttft_vals = [eva.aux["ttft"] for eva in population.evaluations ]
+
+        perplexity = [np.exp(va) for va in val_loss_vals]
+
+        # Ensure all lists have the same length
+        min_len = len(val_loss_vals)
+        
+        for i in range(min_len):
+            size = float(population.evaluations[i].aux.get('params', np.nan))
+            if size < 1000:
+                # fix the unit issue
+                size *= 1e6
+            pop_data.append({
+                'generation': gen,
+                'validation_loss': val_loss_vals[i],
+                # 'energy_per_token': energy_vals[i],
+                # 'ttft': ttft_vals[i],
+                'perplexity': perplexity[i],
+                'individual_id': i,
+                'params': size / 1e6,  # in millions
+            })
+
+    df_pop = pd.DataFrame(pop_data)
+
+    # based on the x_axis and y_axis, select the design on the first pareto front and highlight them
+    if x_axis not in df_pop.columns or y_axis not in df_pop.columns or color_axis not in df_pop.columns:
+        exit(f"❌ Invalid axis names. Available columns: {df_pop.columns.tolist()}")
+
+    # Select the designs on the first Pareto front
+    pareto_front = get_pareto_front(df_pop[x_axis], df_pop[y_axis])
+    pareto_df = pd.DataFrame(pareto_front, columns=[x_axis, y_axis])
+
+    print("Detected Pareto front designs:")
+    print(pareto_df)
+
+    # Create scatter plot
+    fig, ax = plt.subplots(dpi=400)
+    # Normalize color scale across all points so the colorbar is consistent
+    vmin = df_pop[color_axis].min() if fix_color_scale else None
+    vmax = df_pop[color_axis].max() if fix_color_scale else None
+    # Build a truncated colormap to avoid overly light tones
+    base_cmap = plt.get_cmap(cmap) if isinstance(cmap, str) else cmap
+    cmap_vals = base_cmap(np.linspace(max(0.0, cmap_min), min(1.0, cmap_max), 256))
+    truncated_cmap = mcolors.LinearSegmentedColormap.from_list(
+        f"{getattr(base_cmap, 'name', 'cmap')}_trunc",
+        cmap_vals
+    )
+
+    # Split generations: <= ckpt_gen use blue map, > ckpt_gen use red map for contrast
+    mask_late = (df_pop[color_axis] > ckpt_gen) & (df_pop[color_axis] <= end_gen)
+    mask_early = ~mask_late
+
+    scatter = None
+
+    if mask_early.any():
+        scatter = ax.scatter(
+            df_pop.loc[mask_early, x_axis],
+            df_pop.loc[mask_early, y_axis],
+            c=df_pop.loc[mask_early, color_axis],
+            cmap=truncated_cmap,
+            vmin=vmin,
+            vmax=vmax,
+            s=point_size,
+            label=f'Generations ≤ {ckpt_gen}' if ckpt_gen < end_gen else f'Generations'
+        )
+
+    if mask_late.any():
+        base_red_cmap = plt.get_cmap('Reds')
+        red_vals = base_red_cmap(np.linspace(max(0.0, cmap_min), min(1.0, cmap_max), 256))
+        truncated_red_cmap = mcolors.LinearSegmentedColormap.from_list(
+            f"{getattr(base_red_cmap, 'name', 'Reds')}_trunc",
+            red_vals
+        )
+        scatter_late = ax.scatter(
+            df_pop.loc[mask_late, x_axis],
+            df_pop.loc[mask_late, y_axis],
+            c=df_pop.loc[mask_late, color_axis],
+            cmap=truncated_red_cmap,
+            vmin=vmin,
+            vmax=vmax,
+            s=point_size,
+            label=f'Generations > {ckpt_gen}'
+        )
+        if scatter is None:
+            scatter = scatter_late
+
+    # Plot reference points from CSV
+    if ref_csv is not None and os.path.exists(ref_csv):
+        ref_df = pd.read_csv(ref_csv)
+        ref_markers = ['*', 'D', '^', 'v', 's', 'P', 'X', 'h']
+        ref_colors = ['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#a65628', '#f781bf', '#999999']
+        for idx, row in ref_df.iterrows():
+            marker = ref_markers[idx % len(ref_markers)]
+            color = ref_colors[idx % len(ref_colors)]
+            ax.scatter(
+                row['computed_params_M'],
+                row['best_val_loss'],
+                marker=marker,
+                c=color,
+                s=80,
+                zorder=5,
+                edgecolors='black',
+                linewidths=0.5,
+                label=row['name'],
+            )
+
+    # show legend at top-right
+    ax.legend(loc='upper right', fontsize=6, framealpha=0.8)
+
+    # set axis ranges
+    ax.set_xlim(left=50, right=300)
+    ax.set_ylim(bottom=2.5, top=3.1)
+
+
+    # ax.set_xlabel(x_axis)
+    ax.set_xlabel("Size (M)")
+    ax.set_ylabel("Validation Loss")
+
+    # use colorbar from whichever scatter was created
+    if scatter is not None:
+        cbar = plt.colorbar(scatter, ax=ax)
+        if mask_early.any() and mask_late.any():
+            cbar.set_label(f"{color_axis} (blue ≤ {ckpt_gen}, red > {ckpt_gen})")
+        else:
+            cbar.set_label(color_axis)
+    plt.title("Optimizing Accuracy and Size")
+    plt.savefig(save_path)
+    plt.close()
+
+
+def main():
+    """Main function to create the interactive plots"""
+    import os
+    
+    # take arguments from command line
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Create Interactive Generational Scatter Plots")
+    parser.add_argument("--ckpt_base", type=str, default="ckpts/infi_search_200M/ckpt_gen", help="Path to the evolution log file")
+    parser.add_argument("--start_gen", type=int, default=0, help="Starting generation index (default: 1)")
+    parser.add_argument("--ckpt_gen", type=int, default=100, help="Checkpoint generation index (default: 50)")
+    parser.add_argument("--end_gen", type=int, default=50, help="Ending generation index")
+    parser.add_argument("--output", type=str, default="paper_plot/figs/gen_scatter_comp.png", help="Output png file path")
+    parser.add_argument("--ref_csv", type=str, default="ref_results/baseline_200M_results.csv", help="CSV file containing reference points to plot")
+    args = parser.parse_args()
+    
+    file_name_base = args.ckpt_base
+    start_gen = args.start_gen
+    end_gen = args.end_gen
+    output_path = args.output
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    plot_gen_scatter(file_name_base, output_path, start_gen, end_gen, args.ckpt_gen, ref_csv=args.ref_csv)
+
+    # Print completion message
+    print(f"✅ Generational scatter plot saved to {output_path}")
+
+
+if __name__ == "__main__":
+    main()

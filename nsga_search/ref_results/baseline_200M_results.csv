@@ -1,0 +1,4 @@
+name,original_model,original_size,category,n_embd,block_size,n_layers,n_head,n_kv_group,gqa_ratio,head_dim,mlp_size,mlp_ratio,attention_variant,computed_params_M,best_val_loss,best_iter,converged
+Qwen-2.5 7B @200M,Qwen-2.5 7B,7B,scaled-down,768,1024,22,12,2,12:2,64,3840,5.0,causal,198.6,2.7071,18750,True
+LLaMA-2 7B @190M,LLaMA-2 7B,7B,scaled-down,768,1024,32,12,4,12:4,64,2048,2.67,causal,189.6,2.7296,19250,True
+LLaMA-3 8B @200M,LLaMA-3 8B,8B,scaled-down,768,1024,30,12,3,12:3,64,2560,3.33,causal,200.8,2.7649,12750,False

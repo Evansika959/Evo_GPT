@@ -13,6 +13,7 @@ from surrogate import (
 )
 import yaml
 import csv
+import math
 import logging
 import time
 import os
@@ -112,6 +113,7 @@ def real_train_subset(
     conda_env: str = "reallmforge",
     dataset: str = "minipile",
     timeout: int = 10000,
+    gen: int = 0,
 ) -> List[float]:
     """Run real training on a subset of individuals and return their val_loss values.
 
@@ -119,8 +121,9 @@ def real_train_subset(
     then extracts the val_loss results.
     """
     # Create a temporary population with just the selected individuals
+    # Keep gen=0 so to_yaml reads from self.individuals; fetch_results also uses gen=0
     temp_pop = Population(individuals, search_space=None)
-    temp_pop.gen = 0  # Treat as initial population for yaml generation
+    temp_pop.gen = 0
     train_yaml_path = temp_pop.to_yaml(save_path="real_eval_train")
 
     from remote_trainer import RemoteTrainer
@@ -128,7 +131,7 @@ def real_train_subset(
     trainer.submit_job(
         path_to_yaml=train_yaml_path,
         remote_work_dir=f"/home/{user}/Evo_GPT",
-        dir_name=run_dir_name + "_realeval",
+        dir_name=run_dir_name + f"_realeval_gen{gen}",
         max_iters=max_iters,
         conda_env=conda_env,
         dataset=dataset,
@@ -434,44 +437,60 @@ def main():
                 conda_env=args.conda_env,
                 dataset=args.dataset,
                 timeout=args.timeout,
+                gen=gen,
             )
+
+            # Filter out failed runs (inf val_loss)
+            valid_mask = [math.isfinite(l) for l in real_losses]
+            n_failed = sum(1 for v in valid_mask if not v)
+            if n_failed > 0:
+                print(f"WARNING: {n_failed}/{len(real_losses)} real training runs failed (inf val_loss), excluding from finetuning")
+            valid_individuals = [ind for ind, v in zip(selected_individuals, valid_mask) if v]
+            valid_losses = [l for l, v in zip(real_losses, valid_mask) if v]
+            valid_preds = [p for p, v in zip(selected_preds, valid_mask) if v]
+            valid_src_indices = [idx for idx, v in zip(selected_indices, valid_mask) if v]
 
             # Build map for offspring-based strategies (for gen_results CSV)
             if not selects_from_population:
                 for sel_i, off_idx in enumerate(selected_indices):
-                    real_trained_map[off_idx] = real_losses[sel_i]
+                    if valid_mask[sel_i]:
+                        real_trained_map[off_idx] = real_losses[sel_i]
 
-            # 3. Compare & log accuracy (summary)
-            metrics = compute_accuracy_metrics(selected_preds, real_losses)
-            print(f"Surrogate accuracy (n={len(selected_indices)}): "
-                  f"L1={metrics['l1']:.4f}, Spearman={metrics['spearman_r']:.4f}, "
-                  f"PairAcc={metrics['pairwise_acc']:.2%}")
+            # 3. Compare & log accuracy (summary) — only on valid runs
+            if not valid_losses:
+                print("WARNING: All real training runs failed, skipping accuracy logging and finetuning")
+            else:
+                metrics = compute_accuracy_metrics(valid_preds, valid_losses)
+                print(f"Surrogate accuracy (n={len(valid_losses)}): "
+                      f"L1={metrics['l1']:.4f}, Spearman={metrics['spearman_r']:.4f}, "
+                      f"PairAcc={metrics['pairwise_acc']:.2%}")
 
-            with open(accuracy_log_path, "a", newline="") as f:
-                csv.writer(f).writerow([
-                    gen, len(selected_indices), buffer.size + len(selected_indices),
-                    f"{metrics['l1']:.6f}", f"{metrics['spearman_r']:.4f}", f"{metrics['pairwise_acc']:.4f}",
-                ])
-
-            # 4. Log per-individual pred vs real comparison
-            with open(comparison_log_path, "a", newline="") as f:
-                writer = csv.writer(f)
-                for sel_i, src_idx in enumerate(selected_indices):
-                    ind = source_pool[src_idx]
-                    writer.writerow([
-                        gen, source_label, src_idx,
-                        f"{selected_preds[sel_i]:.6f}",
-                        f"{real_losses[sel_i]:.6f}",
-                        f"{metrics['per_error'][sel_i]:.6f}",
-                        f"{ind.estimate_params() / 1e6:.3f}",
+                with open(accuracy_log_path, "a", newline="") as f:
+                    csv.writer(f).writerow([
+                        gen, len(valid_losses), buffer.size + len(valid_losses),
+                        f"{metrics['l1']:.6f}", f"{metrics['spearman_r']:.4f}", f"{metrics['pairwise_acc']:.4f}",
                     ])
 
-            # 5. Save real training results: full individual configs + losses
+                # 4. Log per-individual pred vs real comparison
+                with open(comparison_log_path, "a", newline="") as f:
+                    writer = csv.writer(f)
+                    for sel_i, src_idx in enumerate(valid_src_indices):
+                        ind = source_pool[src_idx]
+                        writer.writerow([
+                            gen, source_label, src_idx,
+                            f"{valid_preds[sel_i]:.6f}",
+                            f"{valid_losses[sel_i]:.6f}",
+                            f"{metrics['per_error'][sel_i]:.6f}",
+                            f"{ind.estimate_params() / 1e6:.3f}",
+                        ])
+
+            # 5. Save real training results: full individual configs + losses (all, including failed)
             real_results_entry = {
                 "gen": gen,
                 "strategy": args.real_eval_strategy,
                 "source": source_label,
                 "n_individuals": len(selected_indices),
+                "n_failed": n_failed,
                 "results": [],
             }
             for sel_i, src_idx in enumerate(selected_indices):
@@ -480,7 +499,6 @@ def main():
                     "idx": src_idx,
                     "pred_val_loss": float(selected_preds[sel_i]),
                     "real_val_loss": float(real_losses[sel_i]),
-                    "error": float(metrics["per_error"][sel_i]),
                     "individual": dict(ind),  # full architecture config
                 })
             # Append to JSON (load existing, append, rewrite)
@@ -493,20 +511,21 @@ def main():
             with open(real_results_path, "w") as f:
                 json.dump(all_real_results, f, indent=2, default=str)
 
-            # 6. Accumulate real data
-            buffer.add(selected_individuals, real_losses, max_layers=surrogate_max_layers)
-            print(f"Buffer size: {buffer.size} total real data points")
+            # 6. Accumulate real data — only valid (finite) results
+            if valid_losses:
+                buffer.add(valid_individuals, valid_losses, max_layers=surrogate_max_layers)
+                print(f"Buffer size: {buffer.size} total real data points")
 
-            # 7. Finetune surrogate — overwrite checkpoint in-place so resume picks it up
-            model, norm_stats = finetune_surrogate(
-                model=model,
-                buffer=buffer,
-                norm_stats=norm_stats,
-                device=device,
-                epochs=args.finetune_epochs,
-                lr=args.finetune_lr,
-                save_path=surrogate_ckpt_path,
-            )
+                # 7. Finetune surrogate — overwrite checkpoint in-place so resume picks it up
+                model, norm_stats = finetune_surrogate(
+                    model=model,
+                    buffer=buffer,
+                    norm_stats=norm_stats,
+                    device=device,
+                    epochs=args.finetune_epochs,
+                    lr=args.finetune_lr,
+                    save_path=surrogate_ckpt_path,
+                )
             print(f"--- End real-training verification ---\n")
 
         # Log per-generation results for ALL offspring (only when --verbose_log)

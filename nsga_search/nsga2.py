@@ -35,6 +35,7 @@ class Population:
         # track mutation op that produced each current individual (aligned with self.individuals)
         self.individual_mutation_ops: List[Any] = [None] * len(self.individuals)
         self.gen = 0
+        self.eval_source = None  # "surrogate" or "real"
 
         self.search_space = search_space
         self.objs_settings = objs_settings
@@ -49,7 +50,8 @@ class Population:
 
     def print_summary(self):
         """Print a formatted summary of the population."""
-        print(f"\n=== Population Summary (Generation {self.gen}) ===")
+        source_hint = f" [eval: {self.eval_source}]" if getattr(self, 'eval_source', None) else ""
+        print(f"\n=== Population Summary (Generation {self.gen}){source_hint} ===")
         print(f"Population size: {len(self.individuals)}")
         if self.offspring:
             print(f"Offspring size: {len(self.offspring)}")
@@ -282,6 +284,7 @@ class Population:
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
         payload = {
             "gen": int(self.gen),
+            "eval_source": getattr(self, 'eval_source', None),
             "individuals": self.individuals,
             "evaluations": None if self.evaluations is None else [
                 {"objs": ev.objs, "cons": ev.cons, "aux": ev.aux} for ev in self.evaluations
@@ -384,6 +387,7 @@ class Population:
 
     def apply_pred_loss(self, pred_loss: List[float]) -> None:
         """Populate evaluations from surrogate-predicted val_loss + analytical metrics."""
+        self.eval_source = "surrogate"
         if self.gen == 0:
             self.evaluations = []
         else:
@@ -428,6 +432,7 @@ class Population:
                 self.offspring_evaluations.append(eval_res)
 
     def sw_eval(self, hosts: List[str], user: str, key_filename: str, run_dir_name: str, max_iters: int = 10000, conda_env: str = "reallmforge", sw_only: bool = False, hw_eval_on_reallmasic: bool = False, timeout: int = 10000, dataset: str = "minipile") -> None:
+        self.eval_source = "real"
         # send the training work to worker nodes and wait for results
         train_yaml_path = self.to_yaml(save_path="train")
         trainer = RemoteTrainer(hosts=hosts, user=user, key_filename=key_filename)
@@ -569,8 +574,6 @@ class Population:
             parent1, _ = search_space.crossover(self.individuals[p1_idx], self.individuals[p2_idx], self.crossover_rate)
             child1 = self.search_space.mutate(parent1, self.mutation_rate)
             # child2 = self.search_space.mutate(parent2, self.mutation_rate)
-            print("Generated offspring:")
-            child1.print_individual()
             offspring.append(child1)
 
         self.offspring = offspring
@@ -594,9 +597,6 @@ class Population:
             p = self.individuals[p_idx]
             child, mutation_op = self.search_space.mutate_v2(p)
             # child2 = self.search_space.mutate(parent2, self.mutation_rate)
-            print("Generated offspring:")
-            print(f"Mutation op: {mutation_op}")
-            child.print_individual()
             if isinstance(child, Individual):
                 offspring.append(child)
             else:

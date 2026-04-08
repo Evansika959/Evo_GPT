@@ -9,7 +9,9 @@
 /nsga_search/visualization/
 /nsga_search/tests/
 /nsga_search/utils/
-/nsga_search/ref_models
+/nsga_search/ref_models/
+/nsga_search/real_eval_train/
+/nsga_search/configs/
 /nsga_search/*.bash
 /nsga_search/hw_eval/runs
 /nsga_search/search_space_def/
@@ -17,6 +19,7 @@
 /nsga_search/__pycache__/
 /nsga_search/bash_scripts
 /nsga_search/csv/
+/nsga_search/paper_plot/figs
 
 # llm_morph local artifacts
 /llm_morph/__pycache__/
