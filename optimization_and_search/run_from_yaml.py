@@ -266,7 +266,7 @@ if __name__ == "__main__":
     yaml_path = Path(args.yaml)
     exit_code = 0
     try:
-        exit_code = int(main(yaml_path, args.output_dir, args))
+        exit_code = int(main(yaml_path, Path(args.output_dir).name, args))
     except Exception as e:
         print(f"[red]Fatal error:[/] {e}")
         exit_code = 2

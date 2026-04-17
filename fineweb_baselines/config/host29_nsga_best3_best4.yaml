@@ -1,0 +1,45 @@
+# Host 10.150.0.29: NSGA-Best3 + NSGA-Best4 (sequential)
+
+# --- NSGA-Best3 (~105M, Gen33 Ind1) ---
+- n_layer: 7
+  n_embd: 768
+  block_size: 1024
+  use_concat_heads: true
+  mlp_variant: swiglu
+  use_abs_pos_embeddings: false
+  use_rotary_embeddings: true
+  bias: false
+  wte_weight_tying: true
+  use_pre_ln: true
+  use_peri_ln: true
+  use_post_ln: false
+  n_head_layerlist: [8, 8, 8, 8, 8, 8, 12]
+  n_kv_group_layerlist: [2, 2, 2, 4, 4, 4, 12]
+  mlp_size_layerlist: [768, 768, 768, 3584, 3584, 3584, 1280]
+  n_qk_head_dim_layerlist: [320, 320, 320, 256, 256, 256, 224]
+  n_v_head_dim_layerlist: [512, 512, 512, 224, 224, 224, 256]
+  n_cproj_layerlist: [1, 1, 1, 1, 1, 1, 1]
+  attention_variant_layerlist:
+    [infinite, infinite, infinite, infinite, infinite, infinite, identity]
+
+# --- NSGA-Best4 (~120M, Gen33 Ind17) ---
+- n_layer: 7
+  n_embd: 768
+  block_size: 1024
+  use_concat_heads: true
+  mlp_variant: swiglu
+  use_abs_pos_embeddings: false
+  use_rotary_embeddings: true
+  bias: false
+  wte_weight_tying: true
+  use_pre_ln: true
+  use_peri_ln: true
+  use_post_ln: false
+  n_head_layerlist: [8, 8, 8, 8, 8, 8, 8]
+  n_kv_group_layerlist: [2, 4, 4, 4, 4, 4, 4]
+  mlp_size_layerlist: [768, 3584, 3584, 3584, 3584, 3584, 3584]
+  n_qk_head_dim_layerlist: [320, 224, 224, 224, 224, 224, 224]
+  n_v_head_dim_layerlist: [480, 192, 192, 192, 192, 192, 192]
+  n_cproj_layerlist: [1, 1, 1, 1, 1, 1, 1]
+  attention_variant_layerlist:
+    [infinite, infinite, infinite, infinite, infinite, infinite, infinite]

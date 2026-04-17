@@ -1,0 +1,45 @@
+# Host 10.150.0.38: NSGA-Best5 + NSGA-Best2 (larger NSGA models)
+
+# --- NSGA-Best5 (~199M, 22L, all-infinite) ---
+- n_layer: 22
+  n_embd: 768
+  block_size: 1024
+  use_concat_heads: true
+  mlp_variant: swiglu
+  use_abs_pos_embeddings: false
+  use_rotary_embeddings: true
+  bias: false
+  wte_weight_tying: true
+  use_pre_ln: true
+  use_peri_ln: true
+  use_post_ln: false
+  n_head_layerlist: [16, 16, 16, 6, 8, 2, 6, 6, 16, 6, 6, 6, 12, 3, 8, 8, 8, 8, 4, 4, 4, 4]
+  n_kv_group_layerlist: [2, 2, 2, 6, 8, 2, 2, 1, 4, 3, 3, 6, 12, 3, 8, 8, 8, 4, 4, 4, 4, 4]
+  mlp_size_layerlist: [3840, 3840, 3840, 2816, 1280, 3072, 512, 512, 4096, 1536, 1536, 2048, 1024, 768, 3072, 3072, 3072, 3072, 2816, 2816, 2816, 2816]
+  n_qk_head_dim_layerlist: [256, 256, 320, 416, 224, 288, 448, 480, 512, 256, 256, 256, 96, 512, 416, 416, 512, 512, 192, 192, 192, 192]
+  n_v_head_dim_layerlist: [352, 352, 320, 256, 192, 320, 96, 160, 192, 160, 160, 160, 64, 384, 224, 224, 224, 224, 256, 256, 256, 256]
+  n_cproj_layerlist: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+  attention_variant_layerlist:
+    [infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite]
+
+# --- NSGA-Best2 (~170M, 19L) ---
+- n_layer: 19
+  n_embd: 768
+  block_size: 1024
+  use_concat_heads: true
+  mlp_variant: swiglu
+  use_abs_pos_embeddings: false
+  use_rotary_embeddings: true
+  bias: false
+  wte_weight_tying: true
+  use_pre_ln: true
+  use_peri_ln: true
+  use_post_ln: false
+  n_head_layerlist: [16, 16, 8, 8, 8, 8, 8, 4, 1, 8, 6, 1, 8, 8, 8, 4, 6, 16, 16]
+  n_kv_group_layerlist: [2, 2, 8, 8, 8, 8, 8, 2, 1, 4, 2, 1, 8, 8, 8, 2, 3, 2, 4]
+  mlp_size_layerlist: [1536, 1536, 3840, 3840, 3840, 3840, 3072, 1024, 768, 1792, 512, 768, 1024, 512, 512, 3072, 3072, 768, 768]
+  n_qk_head_dim_layerlist: [352, 320, 160, 192, 160, 160, 192, 256, 256, 128, 224, 256, 64, 64, 64, 256, 256, 160, 160]
+  n_v_head_dim_layerlist: [288, 256, 128, 128, 128, 128, 128, 224, 224, 512, 224, 128, 512, 512, 512, 416, 416, 192, 192]
+  n_cproj_layerlist: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+  attention_variant_layerlist:
+    [infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, identity, identity, infinite, identity, identity, identity, identity, infinite, infinite, identity, identity]

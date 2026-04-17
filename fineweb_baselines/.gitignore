@@ -1,0 +1,9 @@
+# Experiment-local ignores: keep code/config/plot_scripts in repo, exclude outputs
+
+# Training outputs
+results*/
+plots/
+
+# Caches
+__pycache__/
+*.pyc

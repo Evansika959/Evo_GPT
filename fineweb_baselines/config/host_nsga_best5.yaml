@@ -1,0 +1,21 @@
+# NSGA-Best5 (~199M, 22L, all-infinite) — rotary + peri-ln
+- n_layer: 22
+  n_embd: 768
+  block_size: 1024
+  use_concat_heads: true
+  mlp_variant: swiglu
+  use_abs_pos_embeddings: false
+  use_rotary_embeddings: true
+  bias: false
+  wte_weight_tying: true
+  use_pre_ln: true
+  use_peri_ln: true
+  use_post_ln: false
+  n_head_layerlist: [16, 16, 16, 6, 8, 2, 6, 6, 16, 6, 6, 6, 12, 3, 8, 8, 8, 8, 4, 4, 4, 4]
+  n_kv_group_layerlist: [2, 2, 2, 6, 8, 2, 2, 1, 4, 3, 3, 6, 12, 3, 8, 8, 8, 4, 4, 4, 4, 4]
+  mlp_size_layerlist: [3840, 3840, 3840, 2816, 1280, 3072, 512, 512, 4096, 1536, 1536, 2048, 1024, 768, 3072, 3072, 3072, 3072, 2816, 2816, 2816, 2816]
+  n_qk_head_dim_layerlist: [256, 256, 320, 416, 224, 288, 448, 480, 512, 256, 256, 256, 96, 512, 416, 416, 512, 512, 192, 192, 192, 192]
+  n_v_head_dim_layerlist: [352, 352, 320, 256, 192, 320, 96, 160, 192, 160, 160, 160, 64, 384, 224, 224, 224, 224, 256, 256, 256, 256]
+  n_cproj_layerlist: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+  attention_variant_layerlist:
+    [infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite, infinite]

@@ -1,0 +1,42 @@
+# Host 10.150.0.29: Pythia-160M + GPT2-Small (sequential)
+
+# --- 1. Pythia-160M (162M) ---
+# GPT-NeoX: 12L/768d, MHA, parallel attn+MLP, RoPE, no bias, untied emb
+- n_layer: 12
+  n_head: 12
+  n_kv_group: 12
+  n_embd: 768
+  block_size: 1024
+  mlp_expansion_factor: 4
+  mlp_variant: mlp
+  activation_variant: gelu
+  norm_variant_attn: layernorm
+  norm_variant_output: layernorm
+  use_pre_ln: true
+  use_peri_ln: false
+  use_post_ln: false
+  use_abs_pos_embeddings: false
+  use_rotary_embeddings: true
+  use_parallel_mlp: true
+  bias: false
+  wte_weight_tying: false
+
+# --- 2. GPT2-Small (124M) ---
+# Classic: 12L/768d, MHA, GELU, LayerNorm, abs pos emb, weight tying
+- n_layer: 12
+  n_head: 12
+  n_kv_group: 12
+  n_embd: 768
+  block_size: 1024
+  mlp_expansion_factor: 4
+  mlp_variant: mlp
+  activation_variant: gelu
+  norm_variant_attn: layernorm
+  norm_variant_output: layernorm
+  use_pre_ln: true
+  use_peri_ln: false
+  use_post_ln: false
+  use_abs_pos_embeddings: true
+  use_rotary_embeddings: false
+  bias: true
+  wte_weight_tying: true

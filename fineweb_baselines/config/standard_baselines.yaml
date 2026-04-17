@@ -1,0 +1,106 @@
+# Standard baseline architectures trained on FineWeb-Edu-10BT
+# Each model keeps its canonical recipe (no forced peri-ln / rotary modifications)
+
+# --- 1. GPT2-Small (124M) ---
+# Classic: 12L/768d, MHA, GELU, LayerNorm, abs pos emb, weight tying
+- n_layer: 12
+  n_head: 12
+  n_kv_group: 12
+  n_embd: 768
+  block_size: 1024
+  mlp_expansion_factor: 4
+  mlp_variant: mlp
+  activation_variant: gelu
+  norm_variant_attn: layernorm
+  norm_variant_output: layernorm
+  use_pre_ln: true
+  use_peri_ln: false
+  use_post_ln: false
+  use_abs_pos_embeddings: true
+  use_rotary_embeddings: false
+  bias: true
+  wte_weight_tying: true
+
+# --- 2. Pythia-160M (162M) ---
+# GPT-NeoX: 12L/768d, MHA, parallel attn+MLP, RoPE, no bias, untied emb
+- n_layer: 12
+  n_head: 12
+  n_kv_group: 12
+  n_embd: 768
+  block_size: 1024
+  mlp_expansion_factor: 4
+  mlp_variant: mlp
+  activation_variant: gelu
+  norm_variant_attn: layernorm
+  norm_variant_output: layernorm
+  use_pre_ln: true
+  use_peri_ln: false
+  use_post_ln: false
+  use_abs_pos_embeddings: false
+  use_rotary_embeddings: true
+  use_parallel_mlp: true
+  bias: false
+  wte_weight_tying: false
+
+# --- 3. SmoLLM2-135M (135M) ---
+# Deep narrow: 30L/576d, GQA 9h/3kv, SwiGLU, RMSNorm, RoPE
+- n_layer: 30
+  n_head: 9
+  n_kv_group: 3
+  n_embd: 576
+  block_size: 1024
+  mlp_variant: swiglu
+  mlp_size: 1536              # 576 * 8/3
+  activation_variant: gelu
+  use_gradient_checkpointing: true  # 30-layer needs it at bs=64
+  norm_variant_attn: rmsnorm
+  norm_variant_output: rmsnorm
+  use_pre_ln: true
+  use_peri_ln: false
+  use_post_ln: false
+  use_abs_pos_embeddings: false
+  use_rotary_embeddings: true
+  bias: false
+  wte_weight_tying: true
+
+# --- 4. SmoLLM2-360M (~362M) ---
+# Deep narrow: 32L/960d, GQA 15h/5kv, SwiGLU, RMSNorm, RoPE
+- n_layer: 32
+  n_head: 15
+  n_kv_group: 5
+  n_embd: 960
+  block_size: 1024
+  mlp_variant: swiglu
+  mlp_size: 2560              # 960 * 8/3
+  activation_variant: gelu
+  use_gradient_checkpointing: true
+  norm_variant_attn: rmsnorm
+  norm_variant_output: rmsnorm
+  use_pre_ln: true
+  use_peri_ln: false
+  use_post_ln: false
+  use_abs_pos_embeddings: false
+  use_rotary_embeddings: true
+  bias: false
+  wte_weight_tying: true
+
+# --- 5. Qwen-2.5-0.5B (~494M) ---
+# Modern Qwen2.5: 24L/896d, GQA 14h/2kv, SwiGLU, RMSNorm, RoPE
+- n_layer: 24
+  n_head: 14
+  n_kv_group: 2
+  n_embd: 896
+  block_size: 1024
+  mlp_variant: swiglu
+  mlp_size: 4864
+  activation_variant: gelu
+  use_gradient_checkpointing: true
+  norm_variant_attn: rmsnorm
+  norm_variant_output: rmsnorm
+  use_pre_ln: true
+  use_peri_ln: false
+  use_post_ln: false
+  use_abs_pos_embeddings: false
+  use_rotary_embeddings: true
+  bias: false
+  wte_weight_tying: true
